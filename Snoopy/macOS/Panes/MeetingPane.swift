@@ -178,8 +178,14 @@ struct MeetingPane: View {
             }
             .listStyle(.plain)
             .onChange(of: activeUtteranceID) { _, id in
-                guard player.isPlaying, let id else { return }
-                withAnimation { proxy.scrollTo(id, anchor: .center) }
+                // Follows the playhead however it moved — playing, scrubbing
+                // the waveform, or clicking a timestamp. Scrubbing to a moment
+                // and not being shown what was said there is the whole point of
+                // having the two side by side.
+                guard let id else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(id, anchor: .center)
+                }
             }
         }
     }
@@ -216,8 +222,17 @@ struct MeetingPane: View {
     /// Computing the envelope reads the whole file, so it happens off the main
     /// actor and is cached; the scrubber simply appears when it is ready.
     private func loadWaveform() async {
+        // Clear first: showing the previous meeting's envelope for a frame is
+        // worse than showing none.
+        waveform = nil
         guard let meeting, meeting.audioExists else { return }
-        waveform = await WaveformStore.waveform(for: meeting.id, audio: meeting.audioURL)
+
+        let loaded = await WaveformStore.waveform(for: meeting.id, audio: meeting.audioURL)
+        // It arrives whenever the file has been read, which is abrupt if it
+        // just snaps into place.
+        withAnimation(.easeOut(duration: 0.35)) {
+            waveform = loaded
+        }
     }
 
     private func loadAudio() {
@@ -328,22 +343,35 @@ private struct PlaybackBar: View {
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.secondary)
 
-            if let waveform, !waveform.isEmpty {
-                WaveformScrubber(
-                    waveform: waveform,
-                    duration: duration,
-                    currentTime: player.currentTime,
-                    cuts: cuts,
-                    speakers: speakers,
-                    onSeek: { player.seek(to: $0) }
-                )
-            } else {
-                // The envelope is still being computed, or the audio is gone.
-                Rectangle()
-                    .fill(.quaternary)
-                    .frame(height: 2)
-                    .frame(maxWidth: .infinity)
+            ZStack {
+                // A flat line holds the space while the envelope is computed,
+                // so the controls don't jump when the waveform arrives. It has
+                // to go once the bars are there, or it draws a stray rule
+                // straight through them.
+                if waveform?.isEmpty ?? true {
+                    Capsule()
+                        .fill(.quaternary)
+                        .frame(height: 2)
+                        .frame(maxWidth: .infinity)
+                        .transition(.opacity)
+                }
+
+                if let waveform, !waveform.isEmpty {
+                    WaveformScrubber(
+                        waveform: waveform,
+                        duration: duration,
+                        currentTime: player.currentTime,
+                        cuts: cuts,
+                        speakers: speakers,
+                        onSeek: { player.seek(to: $0) }
+                    )
+                    .transition(
+                        .move(edge: .bottom).combined(with: .opacity)
+                    )
+                }
             }
+            .frame(height: 40)
+            .clipped()
 
             Text(Timecode.short(duration))
                 .font(.system(.caption, design: .monospaced))

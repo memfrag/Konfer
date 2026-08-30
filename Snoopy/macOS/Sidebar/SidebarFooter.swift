@@ -58,9 +58,18 @@ struct SidebarFooter: View {
                 if let fraction = pipeline.stage.fraction, fraction > 0 {
                     Text("\(Int(fraction * 100))%")
                 }
-                Spacer()
                 if !pipeline.queue.isEmpty {
-                    Text("\(pipeline.queue.count) waiting")
+                    Text("· \(pipeline.queue.count) waiting")
+                }
+
+                Spacer()
+
+                if let startedAt = pipeline.activeJobStartedAt {
+                    // `Text(timerInterval:)` keeps its own time, so the clock
+                    // ticks without the footer redrawing once a second.
+                    Text(timerInterval: startedAt...Date.distantFuture, countsDown: false)
+                        .monospacedDigit()
+                        .help("Time spent on this recording")
                 }
             }
             .font(.caption2)

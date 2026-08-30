@@ -64,6 +64,9 @@ final class TranscriptionPipeline {
 
     private(set) var stage: Stage = .idle
     private(set) var activeJob: Job?
+
+    /// When the active job started, for the elapsed clock.
+    private(set) var activeJobStartedAt: Date?
     private(set) var queue: [Job] = []
     private(set) var lastError: PipelineError?
 
@@ -137,6 +140,7 @@ final class TranscriptionPipeline {
         guard activeJob == nil, !queue.isEmpty else { return }
         let job = queue.removeFirst()
         activeJob = job
+        activeJobStartedAt = Date()
         lastError = nil
 
         runTask = Task { [weak self] in
@@ -147,6 +151,7 @@ final class TranscriptionPipeline {
 
     private func finish() {
         activeJob = nil
+        activeJobStartedAt = nil
         stage = .idle
         runTask = nil
         startNextIfIdle()
