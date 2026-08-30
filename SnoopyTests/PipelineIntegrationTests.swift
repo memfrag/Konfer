@@ -91,8 +91,20 @@ struct PipelineIntegrationTests {
 
         pipeline.enqueue(url, language: Self.language)
 
+        var lastTick = Date()
+        var worstStall: TimeInterval = 0
+        var stalls: [TimeInterval] = []
+
         while pipeline.isRunning {
             try await Task.sleep(for: .milliseconds(250))
+            // How late did this main-actor tick actually arrive? A blocked main
+            // thread shows up here as an interval far longer than it asked for.
+            let interval = Date().timeIntervalSince(lastTick)
+            lastTick = Date()
+            if interval > 0.75 {
+                stalls.append(interval)
+                worstStall = max(worstStall, interval)
+            }
             let label = pipeline.stage.label
             if label == "Transcribing", let fraction = pipeline.stage.fraction {
                 if fraction >= 0.99, reached99 == nil { reached99 = Date() }
@@ -110,6 +122,14 @@ struct PipelineIntegrationTests {
         }
         stageDurations[currentStage, default: 0] += Date().timeIntervalSince(stageStarted)
         let totalSeconds = Date().timeIntervalSince(runStarted)
+        if !stalls.isEmpty {
+            print(String(
+                format: "  MAIN THREAD stalled %d times, worst %.1fs, total %.1fs",
+                stalls.count, worstStall, stalls.reduce(0, +)
+            ))
+        } else {
+            print("  main thread never stalled")
+        }
         if let reached99 {
             print(String(format: "  stuck at 99%% for %.1fs",
                          Date().timeIntervalSince(reached99)))
