@@ -1,0 +1,856 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		05DC14D8FE171378139360A5 /* TextToolbox in Frameworks */ = {isa = PBXBuildFile; productRef = FA6D14276B5242AEE91A6142 /* TextToolbox */; };
+		14E505448D924E2C26EA46FB /* Markin in Frameworks */ = {isa = PBXBuildFile; productRef = 4476E04AF5B36C2FBF15C086 /* Markin */; };
+		1B48C9936AF6F259E7DF7F44 /* Constructs in Frameworks */ = {isa = PBXBuildFile; productRef = 266BECE55374353296ED03B7 /* Constructs */; };
+		1EF9F2E370DB614B93F46C4C /* SwiftUIToolbox in Frameworks */ = {isa = PBXBuildFile; productRef = EBC5DFC303B40F7768FC0A49 /* SwiftUIToolbox */; };
+		252F2736C36F4B2211B9C8FA /* BinaryDataKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9AFE7AFAB6529F97DBFDB082 /* BinaryDataKit */; };
+		3D6474BD5D5EE53266FDE281 /* CollectionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1622D7DA02CA707809634690 /* CollectionKit */; };
+		40484E3790085ECF73F56E21 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 59D3FA40CE7CFB67BDD288C6 /* Sparkle */; };
+		55A0CDD72A0F51284A3391B7 /* AttributionsUI in Frameworks */ = {isa = PBXBuildFile; productRef = 432A9F2CDD8AC1AD907726D7 /* AttributionsUI */; };
+		6B7CD8E01092CB5725411A1D /* AppRouting in Frameworks */ = {isa = PBXBuildFile; productRef = 7B04BB2C19BE2D0274647EB3 /* AppRouting */; };
+		825922900F39E4DF305285E0 /* AppDesign in Frameworks */ = {isa = PBXBuildFile; productRef = 4ADCB8A9FAF30A682BC61780 /* AppDesign */; };
+		A3839C261DE6EC8E36ABE650 /* SensibleStyling in Frameworks */ = {isa = PBXBuildFile; productRef = 344D965DDBA4E732D33D523A /* SensibleStyling */; };
+		A8A5786F3834722CF73A5816 /* MessagePackKit in Frameworks */ = {isa = PBXBuildFile; productRef = C261F438FD194418AEE69AB9 /* MessagePackKit */; };
+		AD5C8A723366719B644502A2 /* SettingsUI in Frameworks */ = {isa = PBXBuildFile; productRef = EAB731663936D565B5BDD570 /* SettingsUI */; };
+		B007C637BD4A7E3AE8B1B5A9 /* SystemKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7BC3097FA5DDFAD02CDEAF0B /* SystemKit */; };
+		B74A69E5C60E545E1A57565B /* Zipcode in Frameworks */ = {isa = PBXBuildFile; productRef = D3A9DF2FACFA9F852B4E9B31 /* Zipcode */; };
+		B96F06F40C15FD352A1AB102 /* URLToolbox in Frameworks */ = {isa = PBXBuildFile; productRef = F01E46F03A81FE4E87969C62 /* URLToolbox */; };
+		C7FDE860CCC9C30F5DCBB7FF /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 7CC02C4E379A518902B5FD3B /* MarkdownUI */; };
+		CB0E47EEE27A1F1903CC4113 /* UserDefaultsUI in Frameworks */ = {isa = PBXBuildFile; productRef = B127D9F4718C699720EC1BE8 /* UserDefaultsUI */; };
+		D5AC203A1271E0B7EBC7C556 /* MathKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1148E58D0F4254395A3CE876 /* MathKit */; };
+		F24EC1CCBFA39C070CC29923 /* CGMath in Frameworks */ = {isa = PBXBuildFile; productRef = E6F988F62629251B6274FBE5 /* CGMath */; };
+		FA01D000000000000000FA03 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA01D000000000000000FA02 /* FluidAudio */; };
+		FA02D000000000000000FA0B /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA02D000000000000000FA0C /* FluidAudio */; };
+		FA03D000000000000000FA03 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = FA03D000000000000000FA02 /* WhisperKit */; };
+		FE9668F290A0508ED843F05C /* KeyValueStore in Frameworks */ = {isa = PBXBuildFile; productRef = 95AB53DA5BA77E8FEA5FA282 /* KeyValueStore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		FA02D000000000000000FA0A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9690C6C3B960DEB69363873A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F5EA878784DFC457D8BDC964;
+			remoteInfo = Snoopy;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		9D53EC1EB02E9AB4B84CD823 /* AppDesign */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AppDesign; path = Packages/AppDesign; sourceTree = SOURCE_ROOT; };
+		AEC4B61CCD8A6EDC256FE7BC /* Snoopy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Snoopy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA02D000000000000000FA08 /* SnoopyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnoopyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F8DDBAB2600EFE5B649FED28 /* Exceptions for "Snoopy" folder in "Snoopy" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				macOS/Info.plist,
+			);
+			target = F5EA878784DFC457D8BDC964 /* Snoopy */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		648036F99B3DCE15421875DF /* Snoopy */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F8DDBAB2600EFE5B649FED28 /* Exceptions for "Snoopy" folder in "Snoopy" target */,
+			);
+			path = Snoopy;
+			sourceTree = "<group>";
+		};
+		FA02D000000000000000FA07 /* SnoopyTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SnoopyTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		33839C738869513AB844BB22 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				825922900F39E4DF305285E0 /* AppDesign in Frameworks */,
+				40484E3790085ECF73F56E21 /* Sparkle in Frameworks */,
+				6B7CD8E01092CB5725411A1D /* AppRouting in Frameworks */,
+				55A0CDD72A0F51284A3391B7 /* AttributionsUI in Frameworks */,
+				252F2736C36F4B2211B9C8FA /* BinaryDataKit in Frameworks */,
+				F24EC1CCBFA39C070CC29923 /* CGMath in Frameworks */,
+				3D6474BD5D5EE53266FDE281 /* CollectionKit in Frameworks */,
+				1B48C9936AF6F259E7DF7F44 /* Constructs in Frameworks */,
+				FA01D000000000000000FA03 /* FluidAudio in Frameworks */,
+				FE9668F290A0508ED843F05C /* KeyValueStore in Frameworks */,
+				FA03D000000000000000FA03 /* WhisperKit in Frameworks */,
+				C7FDE860CCC9C30F5DCBB7FF /* MarkdownUI in Frameworks */,
+				14E505448D924E2C26EA46FB /* Markin in Frameworks */,
+				D5AC203A1271E0B7EBC7C556 /* MathKit in Frameworks */,
+				A8A5786F3834722CF73A5816 /* MessagePackKit in Frameworks */,
+				A3839C261DE6EC8E36ABE650 /* SensibleStyling in Frameworks */,
+				AD5C8A723366719B644502A2 /* SettingsUI in Frameworks */,
+				1EF9F2E370DB614B93F46C4C /* SwiftUIToolbox in Frameworks */,
+				B007C637BD4A7E3AE8B1B5A9 /* SystemKit in Frameworks */,
+				05DC14D8FE171378139360A5 /* TextToolbox in Frameworks */,
+				B96F06F40C15FD352A1AB102 /* URLToolbox in Frameworks */,
+				CB0E47EEE27A1F1903CC4113 /* UserDefaultsUI in Frameworks */,
+				B74A69E5C60E545E1A57565B /* Zipcode in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA02D000000000000000FA03 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA02D000000000000000FA0B /* FluidAudio in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4D1E8001E39421CD90938167 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AEC4B61CCD8A6EDC256FE7BC /* Snoopy.app */,
+				FA02D000000000000000FA08 /* SnoopyTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		72C08527561358DA4D2420FB = {
+			isa = PBXGroup;
+			children = (
+				CC99453679B987615F001008 /* Packages */,
+				648036F99B3DCE15421875DF /* Snoopy */,
+				FA02D000000000000000FA07 /* SnoopyTests */,
+				4D1E8001E39421CD90938167 /* Products */,
+			);
+			indentWidth = 4;
+			sourceTree = "<group>";
+			tabWidth = 4;
+			usesTabs = 0;
+		};
+		CC99453679B987615F001008 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				9D53EC1EB02E9AB4B84CD823 /* AppDesign */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F5EA878784DFC457D8BDC964 /* Snoopy */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5EA8DDAC4F485A2E71F8B483 /* Build configuration list for PBXNativeTarget "Snoopy" */;
+			buildPhases = (
+				824E570CD087B654060FC769 /* Sources */,
+				43362526595C69B679F008B2 /* Resources */,
+				33839C738869513AB844BB22 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				648036F99B3DCE15421875DF /* Snoopy */,
+			);
+			name = Snoopy;
+			packageProductDependencies = (
+				4ADCB8A9FAF30A682BC61780 /* AppDesign */,
+				59D3FA40CE7CFB67BDD288C6 /* Sparkle */,
+				7B04BB2C19BE2D0274647EB3 /* AppRouting */,
+				432A9F2CDD8AC1AD907726D7 /* AttributionsUI */,
+				9AFE7AFAB6529F97DBFDB082 /* BinaryDataKit */,
+				E6F988F62629251B6274FBE5 /* CGMath */,
+				1622D7DA02CA707809634690 /* CollectionKit */,
+				266BECE55374353296ED03B7 /* Constructs */,
+				FA01D000000000000000FA02 /* FluidAudio */,
+				95AB53DA5BA77E8FEA5FA282 /* KeyValueStore */,
+				FA03D000000000000000FA02 /* WhisperKit */,
+				7CC02C4E379A518902B5FD3B /* MarkdownUI */,
+				4476E04AF5B36C2FBF15C086 /* Markin */,
+				1148E58D0F4254395A3CE876 /* MathKit */,
+				C261F438FD194418AEE69AB9 /* MessagePackKit */,
+				344D965DDBA4E732D33D523A /* SensibleStyling */,
+				EAB731663936D565B5BDD570 /* SettingsUI */,
+				EBC5DFC303B40F7768FC0A49 /* SwiftUIToolbox */,
+				7BC3097FA5DDFAD02CDEAF0B /* SystemKit */,
+				FA6D14276B5242AEE91A6142 /* TextToolbox */,
+				F01E46F03A81FE4E87969C62 /* URLToolbox */,
+				B127D9F4718C699720EC1BE8 /* UserDefaultsUI */,
+				D3A9DF2FACFA9F852B4E9B31 /* Zipcode */,
+			);
+			productName = Snoopy;
+			productReference = AEC4B61CCD8A6EDC256FE7BC /* Snoopy.app */;
+			productType = "com.apple.product-type.application";
+		};
+		FA02D000000000000000FA01 /* SnoopyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA02D000000000000000FA04 /* Build configuration list for PBXNativeTarget "SnoopyTests" */;
+			buildPhases = (
+				FA02D000000000000000FA02 /* Sources */,
+				FA02D000000000000000FA03 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FA02D000000000000000FA09 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				FA02D000000000000000FA07 /* SnoopyTests */,
+			);
+			name = SnoopyTests;
+			packageProductDependencies = (
+				FA02D000000000000000FA0C /* FluidAudio */,
+			);
+			productName = SnoopyTests;
+			productReference = FA02D000000000000000FA08 /* SnoopyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9690C6C3B960DEB69363873A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				ORGANIZATIONNAME = "Martin Johannesson";
+			};
+			buildConfigurationList = 159EF113C480C86C71B02144 /* Build configuration list for PBXProject "Snoopy" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 72C08527561358DA4D2420FB;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5F15B4048418510FA012691C /* XCRemoteSwiftPackageReference "AppRouting" */,
+				28F7AF0F7EC0DB376FEFA2B2 /* XCRemoteSwiftPackageReference "AttributionsUI" */,
+				FC44EE31DC8DE45A374C4E5F /* XCRemoteSwiftPackageReference "BinaryDataKit" */,
+				F86DC1503E17A44D1F6D00A5 /* XCRemoteSwiftPackageReference "CGMath" */,
+				47DCD10574D39FC4B1E61CE1 /* XCRemoteSwiftPackageReference "CollectionKit" */,
+				483D398C5ECF6A556E64D465 /* XCRemoteSwiftPackageReference "Constructs" */,
+				FA01D000000000000000FA01 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+				46D403249901C950DD6CD736 /* XCRemoteSwiftPackageReference "KeyValueStore" */,
+				FA03D000000000000000FA01 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
+				DD6BBD58FF89102A0C1B2188 /* XCRemoteSwiftPackageReference "MarkdownUI" */,
+				CC3DC71447977C1DED3D50E6 /* XCRemoteSwiftPackageReference "Markin" */,
+				EADC4E395D112F4237FD5FF6 /* XCRemoteSwiftPackageReference "MathKit" */,
+				CC183B94C59AAD1F346D228D /* XCRemoteSwiftPackageReference "MessagePackKit" */,
+				22D48A3B44AF9DCE54C91820 /* XCRemoteSwiftPackageReference "SensibleStyling" */,
+				8D6CFFE4009E0D44FA86F29B /* XCRemoteSwiftPackageReference "SettingsUI" */,
+				4EF556EE8E9035ED7411E3CE /* XCRemoteSwiftPackageReference "Sparkle" */,
+				EA7EAA91D6AEF9EA5B12C764 /* XCRemoteSwiftPackageReference "SwiftUIToolbox" */,
+				773390437E51399B2173BEEF /* XCRemoteSwiftPackageReference "SystemKit" */,
+				75FFA4A56F755146554B8671 /* XCRemoteSwiftPackageReference "TextToolbox" */,
+				45BD679EFB2BCBF97B05281C /* XCRemoteSwiftPackageReference "URLToolbox" */,
+				550909F3EDC8F1410AD5365E /* XCRemoteSwiftPackageReference "UserDefaultsUI" */,
+				71324F3D79A6AB70A0F0E60D /* XCRemoteSwiftPackageReference "Zipcode" */,
+				062B91E075C5C7C7D19440A3 /* XCLocalSwiftPackageReference "Packages/AppDesign" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4D1E8001E39421CD90938167 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F5EA878784DFC457D8BDC964 /* Snoopy */,
+				FA02D000000000000000FA01 /* SnoopyTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		43362526595C69B679F008B2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		824E570CD087B654060FC769 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA02D000000000000000FA02 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FA02D000000000000000FA09 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F5EA878784DFC457D8BDC964 /* Snoopy */;
+			targetProxy = FA02D000000000000000FA0A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		59F9F210F67CAEAF1B16F5B7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Martin Johannesson. All rights reserved.";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.2;
+			};
+			name = Release;
+		};
+		7D31F4A9406100E7E9A39FD3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = DefaultAppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1.0.0;
+				DEVELOPMENT_ASSET_PATHS = "\"Snoopy/Preview Content\"";
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_BITCODE = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snoopy/macOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = pizza.martin.Snoopy;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		846C7F449F0CBB69ACCFCC77 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Martin Johannesson. All rights reserved.";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.2;
+			};
+			name = Debug;
+		};
+		9A9BF68D7B89E46852BF0A48 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = DefaultAppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1.0.0;
+				DEVELOPMENT_ASSET_PATHS = "\"Snoopy/Preview Content\"";
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_BITCODE = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snoopy/macOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = pizza.martin.Snoopy;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		FA02D000000000000000FA05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = pizza.martin.SnoopyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Snoopy.app/Contents/MacOS/Snoopy";
+			};
+			name = Debug;
+		};
+		FA02D000000000000000FA06 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = pizza.martin.SnoopyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Snoopy.app/Contents/MacOS/Snoopy";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		159EF113C480C86C71B02144 /* Build configuration list for PBXProject "Snoopy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				846C7F449F0CBB69ACCFCC77 /* Debug */,
+				59F9F210F67CAEAF1B16F5B7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5EA8DDAC4F485A2E71F8B483 /* Build configuration list for PBXNativeTarget "Snoopy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7D31F4A9406100E7E9A39FD3 /* Debug */,
+				9A9BF68D7B89E46852BF0A48 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FA02D000000000000000FA04 /* Build configuration list for PBXNativeTarget "SnoopyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA02D000000000000000FA05 /* Debug */,
+				FA02D000000000000000FA06 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		062B91E075C5C7C7D19440A3 /* XCLocalSwiftPackageReference "Packages/AppDesign" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AppDesign;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		22D48A3B44AF9DCE54C91820 /* XCRemoteSwiftPackageReference "SensibleStyling" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/SensibleStyling.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.2.1;
+			};
+		};
+		28F7AF0F7EC0DB376FEFA2B2 /* XCRemoteSwiftPackageReference "AttributionsUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/AttributionsUI.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.1;
+			};
+		};
+		45BD679EFB2BCBF97B05281C /* XCRemoteSwiftPackageReference "URLToolbox" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/URLToolbox.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.3.1;
+			};
+		};
+		46D403249901C950DD6CD736 /* XCRemoteSwiftPackageReference "KeyValueStore" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/KeyValueStore.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.2;
+			};
+		};
+		47DCD10574D39FC4B1E61CE1 /* XCRemoteSwiftPackageReference "CollectionKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/CollectionKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.1;
+			};
+		};
+		483D398C5ECF6A556E64D465 /* XCRemoteSwiftPackageReference "Constructs" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/Constructs.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.1.2;
+			};
+		};
+		4EF556EE8E9035ED7411E3CE /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.9.1;
+			};
+		};
+		550909F3EDC8F1410AD5365E /* XCRemoteSwiftPackageReference "UserDefaultsUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/UserDefaultsUI.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.1;
+			};
+		};
+		5F15B4048418510FA012691C /* XCRemoteSwiftPackageReference "AppRouting" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/AppRouting.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.9.2;
+			};
+		};
+		71324F3D79A6AB70A0F0E60D /* XCRemoteSwiftPackageReference "Zipcode" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/Zipcode.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.1;
+			};
+		};
+		75FFA4A56F755146554B8671 /* XCRemoteSwiftPackageReference "TextToolbox" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/TextToolbox.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.4.0;
+			};
+		};
+		773390437E51399B2173BEEF /* XCRemoteSwiftPackageReference "SystemKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/SystemKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.8.0;
+			};
+		};
+		8D6CFFE4009E0D44FA86F29B /* XCRemoteSwiftPackageReference "SettingsUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/SettingsUI.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.5;
+			};
+		};
+		CC183B94C59AAD1F346D228D /* XCRemoteSwiftPackageReference "MessagePackKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/MessagePackKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.4.1;
+			};
+		};
+		CC3DC71447977C1DED3D50E6 /* XCRemoteSwiftPackageReference "Markin" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/Markin.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.1;
+			};
+		};
+		DD6BBD58FF89102A0C1B2188 /* XCRemoteSwiftPackageReference "MarkdownUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/MarkdownUI.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.9.1;
+			};
+		};
+		EA7EAA91D6AEF9EA5B12C764 /* XCRemoteSwiftPackageReference "SwiftUIToolbox" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/SwiftUIToolbox.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.0.0;
+			};
+		};
+		EADC4E395D112F4237FD5FF6 /* XCRemoteSwiftPackageReference "MathKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/MathKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.2.2;
+			};
+		};
+		F86DC1503E17A44D1F6D00A5 /* XCRemoteSwiftPackageReference "CGMath" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/CGMath.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.2;
+			};
+		};
+		FA01D000000000000000FA01 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.15.6;
+			};
+		};
+		FA03D000000000000000FA01 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/argmax-oss-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.0;
+			};
+		};
+		FC44EE31DC8DE45A374C4E5F /* XCRemoteSwiftPackageReference "BinaryDataKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apparata/BinaryDataKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.7;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1148E58D0F4254395A3CE876 /* MathKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EADC4E395D112F4237FD5FF6 /* XCRemoteSwiftPackageReference "MathKit" */;
+			productName = MathKit;
+		};
+		1622D7DA02CA707809634690 /* CollectionKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47DCD10574D39FC4B1E61CE1 /* XCRemoteSwiftPackageReference "CollectionKit" */;
+			productName = CollectionKit;
+		};
+		266BECE55374353296ED03B7 /* Constructs */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 483D398C5ECF6A556E64D465 /* XCRemoteSwiftPackageReference "Constructs" */;
+			productName = Constructs;
+		};
+		344D965DDBA4E732D33D523A /* SensibleStyling */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 22D48A3B44AF9DCE54C91820 /* XCRemoteSwiftPackageReference "SensibleStyling" */;
+			productName = SensibleStyling;
+		};
+		432A9F2CDD8AC1AD907726D7 /* AttributionsUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 28F7AF0F7EC0DB376FEFA2B2 /* XCRemoteSwiftPackageReference "AttributionsUI" */;
+			productName = AttributionsUI;
+		};
+		4476E04AF5B36C2FBF15C086 /* Markin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC3DC71447977C1DED3D50E6 /* XCRemoteSwiftPackageReference "Markin" */;
+			productName = Markin;
+		};
+		4ADCB8A9FAF30A682BC61780 /* AppDesign */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppDesign;
+		};
+		59D3FA40CE7CFB67BDD288C6 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4EF556EE8E9035ED7411E3CE /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+		7B04BB2C19BE2D0274647EB3 /* AppRouting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5F15B4048418510FA012691C /* XCRemoteSwiftPackageReference "AppRouting" */;
+			productName = AppRouting;
+		};
+		7BC3097FA5DDFAD02CDEAF0B /* SystemKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 773390437E51399B2173BEEF /* XCRemoteSwiftPackageReference "SystemKit" */;
+			productName = SystemKit;
+		};
+		7CC02C4E379A518902B5FD3B /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DD6BBD58FF89102A0C1B2188 /* XCRemoteSwiftPackageReference "MarkdownUI" */;
+			productName = MarkdownUI;
+		};
+		95AB53DA5BA77E8FEA5FA282 /* KeyValueStore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 46D403249901C950DD6CD736 /* XCRemoteSwiftPackageReference "KeyValueStore" */;
+			productName = KeyValueStore;
+		};
+		9AFE7AFAB6529F97DBFDB082 /* BinaryDataKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FC44EE31DC8DE45A374C4E5F /* XCRemoteSwiftPackageReference "BinaryDataKit" */;
+			productName = BinaryDataKit;
+		};
+		B127D9F4718C699720EC1BE8 /* UserDefaultsUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 550909F3EDC8F1410AD5365E /* XCRemoteSwiftPackageReference "UserDefaultsUI" */;
+			productName = UserDefaultsUI;
+		};
+		C261F438FD194418AEE69AB9 /* MessagePackKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC183B94C59AAD1F346D228D /* XCRemoteSwiftPackageReference "MessagePackKit" */;
+			productName = MessagePackKit;
+		};
+		D3A9DF2FACFA9F852B4E9B31 /* Zipcode */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 71324F3D79A6AB70A0F0E60D /* XCRemoteSwiftPackageReference "Zipcode" */;
+			productName = Zipcode;
+		};
+		E6F988F62629251B6274FBE5 /* CGMath */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F86DC1503E17A44D1F6D00A5 /* XCRemoteSwiftPackageReference "CGMath" */;
+			productName = CGMath;
+		};
+		EAB731663936D565B5BDD570 /* SettingsUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8D6CFFE4009E0D44FA86F29B /* XCRemoteSwiftPackageReference "SettingsUI" */;
+			productName = SettingsUI;
+		};
+		EBC5DFC303B40F7768FC0A49 /* SwiftUIToolbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EA7EAA91D6AEF9EA5B12C764 /* XCRemoteSwiftPackageReference "SwiftUIToolbox" */;
+			productName = SwiftUIToolbox;
+		};
+		F01E46F03A81FE4E87969C62 /* URLToolbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 45BD679EFB2BCBF97B05281C /* XCRemoteSwiftPackageReference "URLToolbox" */;
+			productName = URLToolbox;
+		};
+		FA01D000000000000000FA02 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA01D000000000000000FA01 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+		FA02D000000000000000FA0C /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA01D000000000000000FA01 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+		FA03D000000000000000FA02 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA03D000000000000000FA01 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
+			productName = WhisperKit;
+		};
+		FA6D14276B5242AEE91A6142 /* TextToolbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 75FFA4A56F755146554B8671 /* XCRemoteSwiftPackageReference "TextToolbox" */;
+			productName = TextToolbox;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 9690C6C3B960DEB69363873A /* Project object */;
+}
