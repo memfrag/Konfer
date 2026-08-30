@@ -42,9 +42,13 @@ nonisolated protocol TranscriptionBackend: Sendable {
     ///   Backends that can be pinned to a language should honour it; Whisper in
     ///   particular detects language *per chunk* when left to itself, which on
     ///   a Swedish meeting full of English loanwords makes it flip mid-file.
+    /// - Parameter speechRegions: Where the diarizer found speech, so a backend
+    ///   that chunks can cut on real silence instead of guessing. Backends are
+    ///   free to ignore it.
     func transcribe(
         _ url: URL,
         language: MeetingLanguage,
+        speechRegions: [SpeechRegion],
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> TranscribedAudio
 }

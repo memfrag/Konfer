@@ -39,26 +39,30 @@ actor WhisperKitBackend: TranscriptionBackend {
 
     /// How WhisperKit splits the file before transcribing.
     ///
-    /// `.none`, deliberately, even though `.vad` is WhisperKit's default and
-    /// roughly three times faster. Measured on five minutes of a real Swedish
-    /// meeting:
+    /// `.none`, deliberately, even though `.vad` is WhisperKit's own default
+    /// and more than twice as fast. Measured on five minutes of a real Swedish
+    /// meeting, words recovered and share of the recording covered:
     ///
-    /// | Strategy | Words | Speech covered | Time |
-    /// |----------|-------|----------------|------|
-    /// | `.vad`   |   606 |            66% |  33s |
-    /// | `.none`  |   813 |            86% |  93s |
+    /// | Strategy                    | Words     | Covered | Time |
+    /// |-----------------------------|-----------|---------|------|
+    /// | `.vad`, WhisperKit's EnergyVAD | 606    |     66% |  33s |
+    /// | `.vad`, ``DiarizationVAD``  | 483–791   |  51–86% |  42s |
+    /// | `.none`                     | 813, 813  |     86% |  93s |
     ///
-    /// VAD chunking loses about a quarter of the speech. Two mechanisms:
-    /// chunks are cut on silence and clip quiet speech at the seams, and a
-    /// chunk that fails to decode is dropped with nothing but a debug log
-    /// (`AudioChunker.updateSeekOffsetsForResults`). Tuning the detector makes
-    /// it worse rather than better — a more sensitive threshold produces more
-    /// chunks, and so more seams (507 words at 0.005/0.2, 583 at 0.002/0.4).
+    /// The ranges are not a typo. **Chunked transcription is not
+    /// deterministic**: the same file, the same settings and the same speech
+    /// regions produced 791, 657 and 639 words on three consecutive runs.
+    /// Unchunked produced 813 twice, identically. A chunk that fails to decode
+    /// is dropped with nothing but a debug log
+    /// (`AudioChunker.updateSeekOffsetsForResults`), so with 16 concurrent
+    /// workers a transient failure silently removes part of the meeting — and
+    /// looks exactly like a pause.
     ///
-    /// Transcription is a background job you walk away from, so three times
-    /// the wall clock is a much better trade than a quarter of the meeting
-    /// silently missing. Override with `SNOOPY_CHUNKING=none|vad`.
-    nonisolated static var chunkingStrategy: ChunkingStrategy {
+    /// ``DiarizationVAD`` fixes the *detector* — it beats energy thresholding
+    /// comfortably — but it cannot fix that. A meeting transcript that differs
+    /// each time you produce it is not worth halving the wait for, so chunking
+    /// stays off. `SNOOPY_CHUNKING=vad` re-enables it for comparison runs.
+    nonisolated static func chunkingStrategy(hasSpeechRegions: Bool) -> ChunkingStrategy {
         ProcessInfo.processInfo.environment["SNOOPY_CHUNKING"]
             .flatMap(ChunkingStrategy.init(rawValue:)) ?? .none
     }
@@ -118,10 +122,20 @@ actor WhisperKitBackend: TranscriptionBackend {
     func transcribe(
         _ url: URL,
         language: MeetingLanguage,
+        speechRegions: [SpeechRegion],
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> TranscribedAudio {
 
         guard let whisperKit else { throw PipelineError.modelsNotLoaded }
+
+        // Chunking is only safe when we can tell it where the speech actually
+        // is. With the diarizer's segmentation in hand we can chunk (and so use
+        // WhisperKit's 16 concurrent workers); without it we transcribe the
+        // file in one pass rather than let an energy threshold guess.
+        let strategy = Self.chunkingStrategy(hasSpeechRegions: !speechRegions.isEmpty)
+        whisperKit.voiceActivityDetector = speechRegions.isEmpty
+            ? nil
+            : DiarizationVAD(regions: speechRegions)
 
         // Pinning the language matters more than it looks. Left to detect,
         // Whisper decides per VAD chunk, and a Swedish meeting sprinkled with
@@ -134,7 +148,7 @@ actor WhisperKitBackend: TranscriptionBackend {
             task: .transcribe,
             language: Self.whisperLanguage(for: language),
             wordTimestamps: true,
-            chunkingStrategy: Self.chunkingStrategy
+            chunkingStrategy: strategy
         )
 
         let results = try await whisperKit.transcribe(

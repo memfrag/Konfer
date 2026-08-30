@@ -78,23 +78,45 @@ again. Every run after the first is fully offline.
 ### Why transcription isn't chunked
 
 WhisperKit defaults to splitting a file on silence (`chunkingStrategy: .vad`)
-and decoding the chunks concurrently. Snoopy turns that off. Measured on five
-minutes of a real Swedish meeting:
+and decoding the chunks across 16 concurrent workers. Snoopy turns that off,
+and it costs more than twice the wall clock to do so.
 
-| Strategy | Words | Speech covered | Time |
+It isn't simply that the detector is bad — though it is. Measuring the
+recording's own frame energy against WhisperKit's fixed 0.02 threshold:
+
+```
+frames >= 0.02   67.8%   <- what EnergyVAD calls speech
+noise floor (p5) 0.0033  -> six times BELOW the threshold
+```
+
+Background noise isn't tripping it; the opposite. A far-field mic leaves a
+quarter of the speech *quieter* than the threshold. Lowering the threshold
+doesn't help, because the chunker splits on the longest silence it can find —
+remove the silences and it cuts mid-word instead, which is exactly what makes
+Whisper hallucinate (507 words at threshold 0.005, 583 at 0.002).
+
+Snoopy already runs pyannote before it transcribes, so `DiarizationVAD` hands
+those segments to WhisperKit as the speech mask. That beats energy thresholding
+comfortably — and still isn't enough. Five minutes of a real Swedish meeting:
+
+| Strategy | Words | Covered | Time |
 |---|---|---|---|
-| `.vad` (WhisperKit default) | 606 | 66% | 33 s |
-| `.none` (Snoopy) | **813** | **86%** | 93 s |
+| `.vad`, WhisperKit's EnergyVAD | 606 | 66% | 33 s |
+| `.vad`, `DiarizationVAD` | **483–791** | **51–86%** | 42 s |
+| `.none` (Snoopy) | **813, 813** | **86%** | 93 s |
 
-On the full hour the same setting gives 88% coverage.
+The range is not a typo. **Chunked transcription is not deterministic.** The
+same file with the same settings and the same speech regions produced 791, 657
+and 639 words on three consecutive runs; unchunked produced 813 twice,
+identically. A chunk that fails to decode is dropped with only a debug log, so
+with 16 workers a transient failure quietly removes part of the meeting — and
+looks exactly like a pause.
 
-VAD chunking loses about a quarter of the speech — chunks clip quiet speech at
-the seams, and a chunk that fails to decode is dropped with nothing but a debug
-log. Tuning the detector makes it *worse*: a more sensitive threshold produces
-more chunks and so more seams (507 words at threshold 0.005, 583 at 0.002).
+A transcript that differs every time you produce it isn't worth halving the
+wait for. `DiarizationVAD` stays in the tree because it makes the comparison
+honest and re-runnable (`SNOOPY_CHUNKING=vad`), but chunking is off.
 
-Transcription is a background job you walk away from, so three times the wall
-clock beats a quarter of the meeting going silently missing.
+On the full hour, unchunked gives 88% coverage.
 
 ### Why the language tag matters
 

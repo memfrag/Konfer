@@ -54,9 +54,12 @@ actor AppleSpeechBackend: TranscriptionBackend {
         isReady = false
     }
 
+    /// - Parameter speechRegions: Ignored. `SpeechAnalyzer` consumes the file
+    ///   itself and does its own segmentation.
     func transcribe(
         _ url: URL,
         language: MeetingLanguage,
+        speechRegions: [SpeechRegion],
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> TranscribedAudio {
 

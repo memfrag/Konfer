@@ -210,7 +210,11 @@ final class TranscriptionPipeline {
             do {
                 transcribed = try await backend.transcribe(
                     audio.url,
-                    language: job.language
+                    language: job.language,
+                    speechRegions: SpeechRegion.regions(
+                        from: segments,
+                        padding: SpeechRegion.padding
+                    )
                 ) { [weak self] fraction in
                     Task { @MainActor in self?.stage = .transcribing(fraction) }
                 }
