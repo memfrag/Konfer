@@ -53,13 +53,11 @@ downloaded:
 | Stage | Time |
 |---|---|
 | Diarization | 28.9 s |
-| Transcription | 1359.7 s |
-| **Total** | **25 min — 3× real time** |
+| Transcription | 585.0 s |
+| **Total** | **10.3 min — 7× real time** |
 
-12,418 words across 353 turns and 6 speakers, covering 88% of the recording's
+12,383 words across 356 turns and 6 speakers, covering 87% of the recording's
 duration. Peak memory about 1.4 GB.
-
-Transcription dominates, and that is a deliberate trade — see below.
 
 ## Models
 
@@ -114,9 +112,35 @@ looks exactly like a pause.
 
 A transcript that differs every time you produce it isn't worth halving the
 wait for. `DiarizationVAD` stays in the tree because it makes the comparison
-honest and re-runnable (`SNOOPY_CHUNKING=vad`), but chunking is off.
+honest and re-runnable (`SNOOPY_CHUNKING=vad`), but WhisperKit's chunking is off.
 
-On the full hour, unchunked gives 88% coverage.
+### Coarse slicing: the parallelism without the losses
+
+WhisperKit's chunker caps every chunk at its 30-second window, so it can't be
+asked for "four chunks" — five minutes is at least ten, an hour over a hundred,
+and every seam is somewhere speech can go missing. Snoopy works one level up
+instead: cut the recording into a **few long slices at real silences** (found in
+the diarizer's segmentation), transcribe each in one complete unchunked pass,
+and run the slices concurrently.
+
+| Slices | Words | Covered | Time |
+|---|---|---|---|
+| 1 | 813 | 86% | 93 s |
+| 2 | 811 | 86% | 54 s |
+| 4 | **832, 832** | 86% | **42 s** |
+
+Repeatable to the word, and no loss — a slice boundary in real silence costs
+nothing, unlike a chunk boundary mid-sentence. On the full hour it takes 10.3
+minutes instead of 25, for 12,383 words against 12,418: a 0.3% difference rather
+than 25%.
+
+Two constraints learned the hard way. Concurrency is capped at 4 because the
+Neural Engine is one shared resource — eight simultaneous ten-minute decodes
+make CoreML give up with *"ANE op async execution has timed out"*. And a slice
+that fails comes back as a `Result` we inspect and surface as an error, which is
+precisely what WhisperKit's own chunker does not do.
+
+`SNOOPY_SLICES=1` restores a single pass.
 
 ### Why the language tag matters
 

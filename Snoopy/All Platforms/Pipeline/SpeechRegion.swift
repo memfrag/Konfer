@@ -18,13 +18,56 @@ nonisolated struct SpeechRegion: Sendable, Equatable {
     var duration: TimeInterval { max(0, end - start) }
 }
 
-extension SpeechRegion {
+nonisolated extension SpeechRegion {
 
     /// Seconds of slack added around each diarization segment.
     /// `SNOOPY_VAD_PADDING` overrides it for comparison runs.
     static var padding: TimeInterval {
         ProcessInfo.processInfo.environment["SNOOPY_VAD_PADDING"]
             .flatMap(TimeInterval.init) ?? 0.4
+    }
+
+    /// Picks `count - 1` places to cut the recording, each in real silence.
+    ///
+    /// The aim is coarse parallelism without WhisperKit's chunker: a handful of
+    /// long slices, each transcribed in one complete pass, cut where nobody is
+    /// speaking. Boundaries are chosen by walking out from an even division to
+    /// the nearest gap between speech regions, so a cut never lands mid-word.
+    ///
+    /// - Returns: Cut times in seconds, ascending. Empty when the recording is
+    ///   too short to divide or no safe gap exists.
+    static func cutPoints(
+        in regions: [SpeechRegion],
+        duration: TimeInterval,
+        slices: Int,
+        minimumSliceSeconds: TimeInterval = 60
+    ) -> [TimeInterval] {
+
+        guard slices > 1, duration > minimumSliceSeconds * Double(slices) else { return [] }
+
+        // Silence between one region's end and the next one's start.
+        let gaps: [(midpoint: TimeInterval, width: TimeInterval)] = zip(regions, regions.dropFirst())
+            .map { (($0.end + $1.start) / 2, $1.start - $0.end) }
+            .filter { $0.1 > 0 }
+        guard !gaps.isEmpty else { return [] }
+
+        var cuts: [TimeInterval] = []
+        for index in 1..<slices {
+            let target = duration * Double(index) / Double(slices)
+            // Nearest gap to the ideal split, preferring wider gaps when two are
+            // similarly close.
+            let best = gaps.min {
+                (abs($0.midpoint - target) - $0.width) < (abs($1.midpoint - target) - $1.width)
+            }
+            guard let best else { continue }
+            let cut = best.midpoint
+            // Keep slices apart, and never emit the same gap twice.
+            if let previous = cuts.last, cut - previous < minimumSliceSeconds { continue }
+            if cut > minimumSliceSeconds, duration - cut > minimumSliceSeconds {
+                cuts.append(cut)
+            }
+        }
+        return cuts
     }
 
     /// Collapses diarization segments into non-overlapping speech regions.
