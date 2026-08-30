@@ -3,6 +3,7 @@
 //
 
 import AVFoundation
+import Accelerate
 import Foundation
 
 /// A downsampled amplitude envelope of a recording, for drawing.
@@ -45,7 +46,7 @@ nonisolated enum WaveformStore {
             return waveform
         }
 
-        guard let waveform = await Task.detached(priority: .utility, operation: {
+        guard let waveform = await Task.detached(priority: .userInitiated, operation: {
             try? computeWaveform(at: url)
         }).value else { return nil }
 
@@ -69,6 +70,12 @@ nonisolated enum WaveformStore {
     /// Peak rather than RMS: speech looks like speech at this scale, and quiet
     /// passages stay visible instead of flattening into the baseline — which
     /// matters here, since quiet speech is exactly what the energy VAD missed.
+    ///
+    /// Each bucket is one `vDSP_maxmgv` call rather than a Swift loop over its
+    /// samples. That is not premature: an hour of audio is over 200 million
+    /// samples, and a bounds-checked scalar loop takes 25 seconds in a debug
+    /// build against 0.3 in a release one. Accelerate is precompiled, so it is
+    /// fast either way — and it is a debug build people run while developing.
     private static func computeWaveform(at url: URL) throws -> Waveform {
         let file = try AVAudioFile(forReading: url)
         let format = file.processingFormat
@@ -76,13 +83,13 @@ nonisolated enum WaveformStore {
         guard totalFrames > 0 else { return Waveform(peaks: []) }
 
         let framesPerBucket = max(1, Int(totalFrames) / resolution)
-        let readSize = AVAudioFrameCount(max(framesPerBucket, 8192))
+        // Read a whole number of buckets at a time, so no bucket straddles two
+        // reads and no carry has to be tracked between them.
+        let bucketsPerRead = max(1, 1_048_576 / framesPerBucket)
+        let readSize = AVAudioFrameCount(framesPerBucket * bucketsPerRead)
 
         var peaks: [Float] = []
         peaks.reserveCapacity(resolution)
-
-        var carry: Float = 0
-        var carried = 0
 
         while file.framePosition < totalFrames {
             let remaining = AVAudioFrameCount(totalFrames - file.framePosition)
@@ -98,24 +105,28 @@ nonisolated enum WaveformStore {
                 // failed read after real audio is the end of the file.
                 break
             }
-            guard buffer.frameLength > 0, let channel = buffer.floatChannelData?[0] else { break }
+            let frames = Int(buffer.frameLength)
+            guard frames > 0, let channel = buffer.floatChannelData?[0] else { break }
 
-            for frame in 0..<Int(buffer.frameLength) {
-                carry = max(carry, abs(channel[frame]))
-                carried += 1
-                if carried == framesPerBucket {
-                    peaks.append(carry)
-                    carry = 0
-                    carried = 0
-                }
+            var offset = 0
+            while offset < frames {
+                let count = min(framesPerBucket, frames - offset)
+                var peak: Float = 0
+                vDSP_maxmgv(channel + offset, 1, &peak, vDSP_Length(count))
+                peaks.append(peak)
+                offset += count
             }
         }
-        if carried > 0 { peaks.append(carry) }
 
         // Normalize so a quietly recorded meeting still fills the view.
-        let loudest = peaks.max() ?? 0
+        var loudest: Float = 0
+        vDSP_maxv(peaks, 1, &loudest, vDSP_Length(peaks.count))
         guard loudest > 0 else { return Waveform(peaks: peaks) }
-        return Waveform(peaks: peaks.map { $0 / loudest })
+
+        var scale = 1 / loudest
+        var scaled = [Float](repeating: 0, count: peaks.count)
+        vDSP_vsmul(peaks, 1, &scale, &scaled, 1, vDSP_Length(peaks.count))
+        return Waveform(peaks: scaled)
     }
 
     static func removeCache(for meetingID: UUID) {
