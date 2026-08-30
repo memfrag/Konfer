@@ -66,7 +66,7 @@ struct SpeakerChip: View {
 
     private func suggestionButton(_ suggestion: EnrollmentSuggestion) -> some View {
         Button(action: onAcceptSuggestion) {
-            Text("Looks like \(suggestion.name)?")
+            Text("Sounds like \(suggestion.name)?")
                 .font(.caption)
         }
         .buttonStyle(.link)

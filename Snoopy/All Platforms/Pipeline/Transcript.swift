@@ -94,7 +94,7 @@ nonisolated struct SpeakerLabel: Identifiable, Codable, Hashable, Sendable {
     /// Total time attributed to this speaker, in seconds.
     var totalDuration: TimeInterval
 
-    /// A pending "Looks like Anna?" suggestion from the enrollment store.
+    /// A pending "Sounds like Anna?" suggestion from the enrollment store.
     /// Suggestions are never applied automatically — see ``SpeakerStore``.
     var suggestion: EnrollmentSuggestion?
 

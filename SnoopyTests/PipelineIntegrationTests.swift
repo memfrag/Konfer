@@ -82,6 +82,7 @@ struct PipelineIntegrationTests {
 
         // Sample the stage as it changes, so the run reports where the time
         // actually went rather than one opaque total.
+        var reached99: Date?
         var lastReportedBucket = -1
         var stageDurations: [String: TimeInterval] = [:]
         var currentStage = pipeline.stage.label
@@ -94,6 +95,7 @@ struct PipelineIntegrationTests {
             try await Task.sleep(for: .milliseconds(250))
             let label = pipeline.stage.label
             if label == "Transcribing", let fraction = pipeline.stage.fraction {
+                if fraction >= 0.99, reached99 == nil { reached99 = Date() }
                 let bucket = Int(fraction * 10)
                 if bucket > lastReportedBucket {
                     lastReportedBucket = bucket
@@ -108,6 +110,10 @@ struct PipelineIntegrationTests {
         }
         stageDurations[currentStage, default: 0] += Date().timeIntervalSince(stageStarted)
         let totalSeconds = Date().timeIntervalSince(runStarted)
+        if let reached99 {
+            print(String(format: "  stuck at 99%% for %.1fs",
+                         Date().timeIntervalSince(reached99)))
+        }
 
         #expect(pipeline.lastError == nil, "\(String(describing: pipeline.lastError))")
 

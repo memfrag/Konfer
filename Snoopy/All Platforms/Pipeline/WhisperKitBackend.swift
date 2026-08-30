@@ -205,13 +205,14 @@ actor WhisperKitBackend: TranscriptionBackend {
         // bar frozen for the whole run. Two signals fix that: slices completing
         // (exact, but rare) and tokens decoding (an estimate, but constant).
         let tokens = TokenCounter()
+        completedFraction = 0
         let audioSeconds = (try? await AVURLAsset(url: request.url).load(.duration).seconds) ?? 0
 
         let reporter = Task { [weak self] in
             var reported = 0.0
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(300))
-                guard let completed = await self?.completedFraction() else { return }
+                guard let completed = await self?.completedFraction else { return }
                 let fraction = max(completed, tokens.estimatedFraction(forAudioSeconds: audioSeconds))
                 // Monotonic and short of 1: finishing is the caller's to report,
                 // and a bar that goes backwards looks broken.
@@ -270,14 +271,13 @@ actor WhisperKitBackend: TranscriptionBackend {
         return TranscribedAudio(text: text, words: words, sliceCuts: sliceCuts)
     }
 
-    /// The share of slices WhisperKit has finished, 0...1. Exact, but it only
-    /// moves when a whole slice lands.
-    private func completedFraction() -> Double {
-        guard let whisperKit else { return 0 }
-        let progress = whisperKit.progress
-        guard progress.totalUnitCount > 0 else { return 0 }
-        return min(max(progress.fractionCompleted, 0), 1)
-    }
+    /// The share of slices actually finished, 0...1.
+    ///
+    /// Counted here rather than read from `WhisperKit.progress`, which is
+    /// over-subscribed: it adds a child per slice but never raises its own
+    /// total, so it reaches 1.0 after the first batch and stays there. That put
+    /// the bar at 99% for 31 of a 52-second stage.
+    private var completedFraction = 0.0
 
     // MARK: - Coarse slicing
 
@@ -344,14 +344,23 @@ actor WhisperKitBackend: TranscriptionBackend {
         var sliceOptions = options
         sliceOptions.concurrentWorkerCount = Self.maximumConcurrentSlices
 
-        let outcomes = await whisperKit.transcribeWithOptions(
-            audioArrays: slices,
-            decodeOptionsArray: Array(repeating: sliceOptions, count: slices.count),
-            callback: { _ in
-                tokens.increment()
-                return nil
-            }
-        )
+        // Submitted a batch at a time rather than all at once, so each batch
+        // returning is an honest progress milestone. WhisperKit would batch
+        // these itself, but then nothing is observable until every slice is
+        // done.
+        var outcomes: [Result<[TranscriptionResult], Swift.Error>] = []
+        for start in stride(from: 0, to: slices.count, by: Self.maximumConcurrentSlices) {
+            let batch = Array(slices[start..<min(start + Self.maximumConcurrentSlices, slices.count)])
+            outcomes += await whisperKit.transcribeWithOptions(
+                audioArrays: batch,
+                decodeOptionsArray: Array(repeating: sliceOptions, count: batch.count),
+                callback: { _ in
+                    tokens.increment()
+                    return nil
+                }
+            )
+            completedFraction = Double(outcomes.count) / Double(slices.count)
+        }
 
         var results: [TranscriptionResult] = []
         for (index, outcome) in outcomes.enumerated() {
