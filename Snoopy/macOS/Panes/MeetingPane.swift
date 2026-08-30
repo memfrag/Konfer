@@ -53,7 +53,10 @@ struct MeetingPane: View {
             header(meeting)
             Divider()
             transcript(meeting)
-            if player.isLoaded {
+            if !meeting.audioExists {
+                Divider()
+                missingAudioNotice
+            } else if player.isLoaded {
                 Divider()
                 PlaybackBar(
                     player: player,
@@ -64,6 +67,21 @@ struct MeetingPane: View {
                 )
             }
         }
+    }
+
+    /// Shown where the player would be, because a missing recording is a
+    /// playback problem: everything else on this screen still works.
+    private var missingAudioNotice: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "waveform.slash")
+                .foregroundStyle(.secondary)
+            Text("Recording not found — playback unavailable")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     // MARK: - Header
@@ -90,16 +108,6 @@ struct MeetingPane: View {
                         + "transcription, which drops some speech. Turn off "
                         + "\"Faster, less complete\" in Settings and transcribe "
                         + "again for a complete version."
-                )
-            }
-
-            if !meeting.audioExists {
-                Banner(
-                    icon: "waveform.slash",
-                    tint: .secondary,
-                    title: "Recording not found",
-                    message: "The audio file has moved or been deleted, so playback "
-                        + "is unavailable. Everything else still works."
                 )
             }
 
@@ -308,8 +316,16 @@ private struct Banner: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
         }
+        // The minimum is what matters. `fixedSize(vertical:)` above asks the
+        // message for its full height at whatever width it is offered, and this
+        // banner is offered a near-zero width during layout, at which the
+        // sentence wraps to one word per line and reports a height of roughly
+        // two thousand points. The split view then grows past the window and
+        // takes the sidebar and the transcript out of view with it. Clamping
+        // the proposal from below means the text is never measured at a width
+        // it could not be drawn at.
+        .frame(minWidth: 260, maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
     }
