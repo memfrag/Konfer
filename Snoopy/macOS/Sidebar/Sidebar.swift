@@ -2,11 +2,13 @@
 //  Copyright © 2026 Martin Johannesson. All rights reserved.
 //
 
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct Sidebar: View {
 
+    @Environment(\.openWindow) private var openWindow
     @Environment(MeetingStore.self) private var meetingStore
     @Environment(TranscriptionPipeline.self) private var pipeline
 
@@ -64,6 +66,13 @@ struct Sidebar: View {
                             MeetingRow(meeting: meeting)
                         }
                         .contextMenu {
+                            Button("Reveal Audio in Finder") {
+                                NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
+                            }
+                            .disabled(!meeting.audioExists)
+
+                            Divider()
+
                             Button("Delete", role: .destructive) {
                                 meetingStore.delete(meeting.id)
                             }
@@ -85,6 +94,14 @@ struct Sidebar: View {
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "Search transcripts")
         .toolbar {
+            ToolbarItem {
+                Button {
+                    openWindow(id: RecorderWindow.windowID)
+                } label: {
+                    Label("Record", systemImage: "record.circle")
+                }
+                .help("Record a meeting")
+            }
             ToolbarItem {
                 Button {
                     isShowingImporter = true

@@ -22,12 +22,10 @@ struct MainWindow: Scene {
             AboutCommand()
             CheckForUpdatesCommand(updater: updater)
             SidebarCommands()
+            RecordCommand()
             ExportCommands()
             HelpCommands()
 
-            // Snoopy has no notion of an empty new document — a meeting only
-            // exists once a recording has been transcribed.
-            CommandGroup(replacing: .newItem, addition: { })
         }
     }
 }

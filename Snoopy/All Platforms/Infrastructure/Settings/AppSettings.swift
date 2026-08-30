@@ -28,6 +28,9 @@ import KeyValueStore
 
         /// Whether to trade completeness for speed when transcribing.
         case fastTranscription
+
+        /// Where new recordings are saved.
+        case recordingFolder
     }
 
     // MARK: Properties
@@ -61,6 +64,13 @@ import KeyValueStore
         }
     }
 
+    /// Folder new recordings are written to. Empty until one is chosen.
+    public var recordingFolder: String {
+        didSet {
+            store.save(recordingFolder, for: .recordingFolder)
+        }
+    }
+
     // MARK: Setup
 
     /// The key–value store that backs this settings container.
@@ -77,6 +87,7 @@ import KeyValueStore
         colorScheme = self.store.load(.colorScheme, default: .system)
         
         fastTranscription = self.store.load(.fastTranscription, default: false)
+        recordingFolder = self.store.load(.recordingFolder, default: "")
         asrBackend = ASRBackendKind(
             rawValue: self.store.load(.asrBackend, default: ASRBackendKind.default.rawValue)
         ) ?? .default
