@@ -140,7 +140,9 @@ make CoreML give up with *"ANE op async execution has timed out"*. And a slice
 that fails comes back as a `Result` we inspect and surface as an error, which is
 precisely what WhisperKit's own chunker does not do.
 
-`SNOOPY_SLICES=1` restores a single pass.
+`SNOOPY_SLICES=1` restores a single pass. The cuts are drawn as ticks under the
+player, so you can see where they landed — a tick in the middle of someone
+talking would be the sign that the automatic placement needs help.
 
 ### Why the language tag matters
 

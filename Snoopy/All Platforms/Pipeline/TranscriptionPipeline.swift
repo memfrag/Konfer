@@ -249,6 +249,7 @@ final class TranscriptionPipeline {
                 speakers: speakerStore.annotate(speakers),
                 utterances: utterances,
                 degraded: degraded,
+                sliceCuts: transcribed.sliceCuts.isEmpty ? nil : transcribed.sliceCuts,
                 wasFastTranscribed: job.fastTranscription ? true : nil
             )
             meetingStore.add(meeting)

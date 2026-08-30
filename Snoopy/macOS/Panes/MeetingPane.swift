@@ -53,7 +53,11 @@ struct MeetingPane: View {
             transcript(meeting)
             if player.isLoaded {
                 Divider()
-                PlaybackBar(player: player, duration: meeting.duration)
+                PlaybackBar(
+                    player: player,
+                    duration: meeting.duration,
+                    cuts: meeting.sliceCuts ?? []
+                )
             }
         }
     }
@@ -245,6 +249,36 @@ struct MeetingPane: View {
     }
 }
 
+// MARK: - Cut markers
+
+/// Ticks showing where the recording was cut for parallel transcription.
+///
+/// Each slice is transcribed in one complete pass, so a cut only costs anything
+/// if it lands mid-speech — and cuts are chosen to sit in silence. This makes
+/// that visible rather than a claim: a tick in the middle of someone talking is
+/// the sign the automatic placement needs help.
+private struct CutMarkers: View {
+
+    let cuts: [TimeInterval]
+    let duration: TimeInterval
+
+    var body: some View {
+        GeometryReader { geometry in
+            ForEach(cuts, id: \.self) { cut in
+                Capsule()
+                    .fill(.tertiary)
+                    .frame(width: 2, height: 5)
+                    .position(
+                        x: geometry.size.width * cut / max(duration, 1),
+                        y: 2.5
+                    )
+                    .help("Transcribed in separate parts, split here at \(Timecode.short(cut))")
+            }
+        }
+        .frame(height: 5)
+    }
+}
+
 // MARK: - Banner
 
 private struct Banner: View {
@@ -281,6 +315,9 @@ private struct PlaybackBar: View {
     let player: PlayerController
     let duration: TimeInterval
 
+    /// Where the recording was cut for parallel transcription.
+    let cuts: [TimeInterval]
+
     var body: some View {
         HStack(spacing: 12) {
             Button {
@@ -303,6 +340,11 @@ private struct PlaybackBar: View {
                 ),
                 in: 0...max(duration, 1)
             )
+            .overlay(alignment: .bottom) {
+                CutMarkers(cuts: cuts, duration: duration)
+                    .allowsHitTesting(false)
+                    .offset(y: 7)
+            }
 
             Text(Timecode.short(duration))
                 .font(.system(.caption, design: .monospaced))

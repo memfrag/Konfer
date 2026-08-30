@@ -173,8 +173,11 @@ actor WhisperKitBackend: TranscriptionBackend {
         )
 
         let results: [TranscriptionResult]
+        var sliceCuts: [TimeInterval] = []
         if strategy == ChunkingStrategy.none, !request.speechRegions.isEmpty {
-            results = try await transcribeInSlices(request, options: options, using: whisperKit)
+            (results, sliceCuts) = try await transcribeInSlices(
+                request, options: options, using: whisperKit
+            )
         } else {
             results = try await whisperKit.transcribe(
                 audioPath: request.url.path,
@@ -204,11 +207,12 @@ actor WhisperKitBackend: TranscriptionBackend {
                 text: text,
                 words: text.isEmpty
                     ? []
-                    : [WordSpan(word: text, start: 0, end: 0)]
+                    : [WordSpan(word: text, start: 0, end: 0)],
+                sliceCuts: sliceCuts
             )
         }
 
-        return TranscribedAudio(text: text, words: words)
+        return TranscribedAudio(text: text, words: words, sliceCuts: sliceCuts)
     }
 
     // MARK: - Coarse slicing
@@ -229,7 +233,7 @@ actor WhisperKitBackend: TranscriptionBackend {
         _ request: TranscriptionRequest,
         options: DecodingOptions,
         using whisperKit: WhisperKit
-    ) async throws -> [TranscriptionResult] {
+    ) async throws -> (results: [TranscriptionResult], cuts: [TimeInterval]) {
 
         let samples = try AudioProcessor.loadAudioAsFloatArray(fromPath: request.url.path)
         let sampleRate = Double(WhisperKit.sampleRate)
@@ -246,10 +250,11 @@ actor WhisperKitBackend: TranscriptionBackend {
         }
         guard !cuts.isEmpty else {
             // No safe place to cut: one pass is the correct answer.
-            return try await whisperKit.transcribe(
+            let whole = try await whisperKit.transcribe(
                 audioPath: request.url.path,
                 decodeOptions: options
             )
+            return (whole, [])
         }
 
         let bounds = [0] + cuts.map { Int($0 * sampleRate) } + [samples.count]
@@ -283,6 +288,6 @@ actor WhisperKitBackend: TranscriptionBackend {
                 throw PipelineError.transcriptionFailed(underlying: error)
             }
         }
-        return results
+        return (results, cuts)
     }
 }

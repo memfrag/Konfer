@@ -10,6 +10,12 @@ import Foundation
 nonisolated struct TranscribedAudio: Sendable {
     let text: String
     let words: [WordSpan]
+
+    /// Where the recording was cut into slices, if it was. Kept so the player
+    /// can show them: a cut that lands in the middle of someone talking is the
+    /// evidence that the automatic placement needs help, and it is invisible
+    /// otherwise.
+    var sliceCuts: [TimeInterval] = []
 }
 
 // MARK: - TranscriptionRequest

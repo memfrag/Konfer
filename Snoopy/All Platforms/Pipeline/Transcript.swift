@@ -182,6 +182,10 @@ nonisolated struct Meeting: Identifiable, Codable, Hashable, Sendable {
     /// Set when a stage failed but the run was still worth keeping.
     var degraded: DegradedStage?
 
+    /// Where the recording was cut for parallel transcription, shown as ticks
+    /// under the player. Optional so earlier meetings still decode.
+    var sliceCuts: [TimeInterval]?
+
     /// Set when this transcript was produced with fast (chunked) transcription,
     /// which is known to drop speech. Optional so meetings written before the
     /// setting existed still decode.
