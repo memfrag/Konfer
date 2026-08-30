@@ -83,14 +83,25 @@ struct Sidebar: View {
                 HStack(spacing: 4) {
                     Text("Meetings")
                     Spacer()
-                    Button {
-                        isShowingImporter = true
+                    Menu {
+                        Button("Transcribe Recording…") {
+                            isShowingImporter = true
+                        }
+                        Button("Record a Meeting…") {
+                            openWindow(id: RecorderWindow.windowID)
+                        }
                     } label: {
                         Image(systemName: "plus")
+                            .imageScale(.large)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .help("Transcribe a recording")
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    // Without this the menu takes the width the header offers
+                    // it and the plus drifts away from the trailing edge.
+                    .fixedSize()
+                    .help("Add a meeting")
+                    .padding(.trailing, 4)
                 }
             }
 
@@ -106,16 +117,6 @@ struct Sidebar: View {
             SidebarFooter()
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "Search transcripts")
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    openWindow(id: RecorderWindow.windowID)
-                } label: {
-                    Label("Record", systemImage: "record.circle")
-                }
-                .help("Record a meeting")
-            }
-        }
     }
 
     private var filteredMeetings: [Meeting] {
