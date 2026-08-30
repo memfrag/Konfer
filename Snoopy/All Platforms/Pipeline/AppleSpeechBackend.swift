@@ -78,11 +78,17 @@ actor AppleSpeechBackend: TranscriptionBackend {
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         let file = try AVAudioFile(forReading: request.url)
 
-        // Collect results while the analyzer consumes the file.
+        let duration = try await AVURLAsset(url: request.url).load(.duration).seconds
+
+        // Collect results while the analyzer consumes the file. Each result
+        // carries the range it covers, which is exactly the progress figure.
         let collector = Task { () -> [WordSpan] in
             var words: [WordSpan] = []
             for try await result in transcriber.results {
                 words.append(contentsOf: Self.wordSpans(in: result.text))
+                if duration > 0 {
+                    progress(min(result.range.end.seconds / duration, 0.99))
+                }
             }
             return words
         }

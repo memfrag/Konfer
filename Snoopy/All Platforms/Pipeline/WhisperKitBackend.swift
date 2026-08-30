@@ -2,6 +2,7 @@
 //  Copyright © 2026 Martin Johannesson. All rights reserved.
 //
 
+import AVFoundation
 import Foundation
 import WhisperKit
 
@@ -16,6 +17,34 @@ import WhisperKit
 /// The first load of a variant compiles the CoreML models, which takes minutes
 /// for `large`; every load after that is about a second.
 ///
+/// Counts decoded tokens, as a fine-grained progress signal.
+///
+/// WhisperKit's own `Progress` only advances when a whole slice finishes — four
+/// updates for a five-minute recording, and on an hour that is minutes of a
+/// motionless bar. Its decoder callback fires per token instead: 1519 times for
+/// the same five minutes.
+private nonisolated final class TokenCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var count = 0
+
+    func increment() {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
+    }
+
+    /// Roughly how far through the audio the decoder is.
+    ///
+    /// Deliberately pessimistic. Measured at about 4.8 tokens per second of
+    /// Swedish meeting audio; assuming 5.5 keeps the estimate just behind the
+    /// truth, so it lags rather than stalling at 99%, and the exact
+    /// slice-completion figure pulls it up whenever a slice lands.
+    func estimatedFraction(forAudioSeconds seconds: Double) -> Double {
+        guard seconds > 0 else { return 0 }
+        return min(Double(count) / (seconds * 5.5), 0.95)
+    }
+}
+
 actor WhisperKitBackend: TranscriptionBackend {
 
     private let variant: KBWhisperModelStore.Variant
@@ -172,16 +201,42 @@ actor WhisperKitBackend: TranscriptionBackend {
             chunkingStrategy: strategy
         )
 
+        // Nothing is reported until a transcribe call returns, which left the
+        // bar frozen for the whole run. Two signals fix that: slices completing
+        // (exact, but rare) and tokens decoding (an estimate, but constant).
+        let tokens = TokenCounter()
+        let audioSeconds = (try? await AVURLAsset(url: request.url).load(.duration).seconds) ?? 0
+
+        let reporter = Task { [weak self] in
+            var reported = 0.0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(300))
+                guard let completed = await self?.completedFraction() else { return }
+                let fraction = max(completed, tokens.estimatedFraction(forAudioSeconds: audioSeconds))
+                // Monotonic and short of 1: finishing is the caller's to report,
+                // and a bar that goes backwards looks broken.
+                if fraction > reported {
+                    reported = fraction
+                    progress(min(fraction, 0.99))
+                }
+            }
+        }
+        defer { reporter.cancel() }
+
         let results: [TranscriptionResult]
         var sliceCuts: [TimeInterval] = []
         if strategy == ChunkingStrategy.none, !request.speechRegions.isEmpty {
             (results, sliceCuts) = try await transcribeInSlices(
-                request, options: options, using: whisperKit
+                request, options: options, using: whisperKit, tokens: tokens
             )
         } else {
             results = try await whisperKit.transcribe(
                 audioPath: request.url.path,
-                decodeOptions: options
+                decodeOptions: options,
+                callback: { _ in
+                    tokens.increment()
+                    return nil
+                }
             )
         }
 
@@ -215,6 +270,15 @@ actor WhisperKitBackend: TranscriptionBackend {
         return TranscribedAudio(text: text, words: words, sliceCuts: sliceCuts)
     }
 
+    /// The share of slices WhisperKit has finished, 0...1. Exact, but it only
+    /// moves when a whole slice lands.
+    private func completedFraction() -> Double {
+        guard let whisperKit else { return 0 }
+        let progress = whisperKit.progress
+        guard progress.totalUnitCount > 0 else { return 0 }
+        return min(max(progress.fractionCompleted, 0), 1)
+    }
+
     // MARK: - Coarse slicing
 
     /// Transcribes the file as a handful of long slices, in parallel.
@@ -232,7 +296,8 @@ actor WhisperKitBackend: TranscriptionBackend {
     private func transcribeInSlices(
         _ request: TranscriptionRequest,
         options: DecodingOptions,
-        using whisperKit: WhisperKit
+        using whisperKit: WhisperKit,
+        tokens: TokenCounter
     ) async throws -> (results: [TranscriptionResult], cuts: [TimeInterval]) {
 
         let samples = try AudioProcessor.loadAudioAsFloatArray(fromPath: request.url.path)
@@ -260,7 +325,11 @@ actor WhisperKitBackend: TranscriptionBackend {
             // No safe place to cut: one pass is the correct answer.
             let whole = try await whisperKit.transcribe(
                 audioPath: request.url.path,
-                decodeOptions: options
+                decodeOptions: options,
+                callback: { _ in
+                    tokens.increment()
+                    return nil
+                }
             )
             return (whole, [])
         }
@@ -277,7 +346,11 @@ actor WhisperKitBackend: TranscriptionBackend {
 
         let outcomes = await whisperKit.transcribeWithOptions(
             audioArrays: slices,
-            decodeOptionsArray: Array(repeating: sliceOptions, count: slices.count)
+            decodeOptionsArray: Array(repeating: sliceOptions, count: slices.count),
+            callback: { _ in
+                tokens.increment()
+                return nil
+            }
         )
 
         var results: [TranscriptionResult] = []

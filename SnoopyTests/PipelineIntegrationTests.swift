@@ -82,6 +82,7 @@ struct PipelineIntegrationTests {
 
         // Sample the stage as it changes, so the run reports where the time
         // actually went rather than one opaque total.
+        var lastReportedBucket = -1
         var stageDurations: [String: TimeInterval] = [:]
         var currentStage = pipeline.stage.label
         var stageStarted = Date()
@@ -92,6 +93,13 @@ struct PipelineIntegrationTests {
         while pipeline.isRunning {
             try await Task.sleep(for: .milliseconds(250))
             let label = pipeline.stage.label
+            if label == "Transcribing", let fraction = pipeline.stage.fraction {
+                let bucket = Int(fraction * 10)
+                if bucket > lastReportedBucket {
+                    lastReportedBucket = bucket
+                    print(String(format: "  transcribing %.0f%%", fraction * 100))
+                }
+            }
             if label != currentStage {
                 stageDurations[currentStage, default: 0] += Date().timeIntervalSince(stageStarted)
                 currentStage = label
