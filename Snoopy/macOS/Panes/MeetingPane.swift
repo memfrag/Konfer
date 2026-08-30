@@ -13,6 +13,7 @@ struct MeetingPane: View {
     @Environment(SpeakerStore.self) private var speakerStore
 
     @State private var player = PlayerController()
+    @State private var waveform: Waveform?
     @State private var exportFormat: TranscriptExporter.Format?
     @State private var exportDocument: TranscriptDocument?
 
@@ -29,6 +30,7 @@ struct MeetingPane: View {
         .navigationTitle(meeting?.title ?? "Transcript")
         .navigationSubtitle(meeting.map { Timecode.short($0.duration) } ?? "")
         .onAppear { loadAudio() }
+        .task(id: meetingID) { await loadWaveform() }
         .onDisappear { player.unload() }
         .focusedSceneValue(\.exportableMeeting, exportable)
         .fileExporter(
@@ -56,7 +58,9 @@ struct MeetingPane: View {
                 PlaybackBar(
                     player: player,
                     duration: meeting.duration,
-                    cuts: meeting.sliceCuts ?? []
+                    cuts: meeting.sliceCuts ?? [],
+                    waveform: waveform,
+                    speakers: speakerSpans(in: meeting)
                 )
             }
         }
@@ -198,6 +202,24 @@ struct MeetingPane: View {
         return words.firstIndex { player.currentTime >= $0.start && player.currentTime < $0.end }
     }
 
+    /// Who speaks when, in the same colours as the chips above the transcript.
+    private func speakerSpans(in meeting: Meeting) -> [SpeakerSpan] {
+        meeting.utterances.map {
+            SpeakerSpan(
+                start: $0.start,
+                end: $0.end,
+                color: SpeakerPalette.color(for: $0.speakerId, in: meeting)
+            )
+        }
+    }
+
+    /// Computing the envelope reads the whole file, so it happens off the main
+    /// actor and is cached; the scrubber simply appears when it is ready.
+    private func loadWaveform() async {
+        guard let meeting, meeting.audioExists else { return }
+        waveform = await WaveformStore.waveform(for: meeting.id, audio: meeting.audioURL)
+    }
+
     private func loadAudio() {
         guard let meeting, meeting.audioExists else { return }
         player.load(meeting.audioURL)
@@ -249,36 +271,6 @@ struct MeetingPane: View {
     }
 }
 
-// MARK: - Cut markers
-
-/// Ticks showing where the recording was cut for parallel transcription.
-///
-/// Each slice is transcribed in one complete pass, so a cut only costs anything
-/// if it lands mid-speech — and cuts are chosen to sit in silence. This makes
-/// that visible rather than a claim: a tick in the middle of someone talking is
-/// the sign the automatic placement needs help.
-private struct CutMarkers: View {
-
-    let cuts: [TimeInterval]
-    let duration: TimeInterval
-
-    var body: some View {
-        GeometryReader { geometry in
-            ForEach(cuts, id: \.self) { cut in
-                Capsule()
-                    .fill(.tertiary)
-                    .frame(width: 2, height: 5)
-                    .position(
-                        x: geometry.size.width * cut / max(duration, 1),
-                        y: 2.5
-                    )
-                    .help("Transcribed in separate parts, split here at \(Timecode.short(cut))")
-            }
-        }
-        .frame(height: 5)
-    }
-}
-
 // MARK: - Banner
 
 private struct Banner: View {
@@ -318,6 +310,9 @@ private struct PlaybackBar: View {
     /// Where the recording was cut for parallel transcription.
     let cuts: [TimeInterval]
 
+    let waveform: Waveform?
+    let speakers: [SpeakerSpan]
+
     var body: some View {
         HStack(spacing: 12) {
             Button {
@@ -333,17 +328,21 @@ private struct PlaybackBar: View {
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.secondary)
 
-            Slider(
-                value: Binding(
-                    get: { min(player.currentTime, duration) },
-                    set: { player.seek(to: $0) }
-                ),
-                in: 0...max(duration, 1)
-            )
-            .overlay(alignment: .bottom) {
-                CutMarkers(cuts: cuts, duration: duration)
-                    .allowsHitTesting(false)
-                    .offset(y: 7)
+            if let waveform, !waveform.isEmpty {
+                WaveformScrubber(
+                    waveform: waveform,
+                    duration: duration,
+                    currentTime: player.currentTime,
+                    cuts: cuts,
+                    speakers: speakers,
+                    onSeek: { player.seek(to: $0) }
+                )
+            } else {
+                // The envelope is still being computed, or the audio is gone.
+                Rectangle()
+                    .fill(.quaternary)
+                    .frame(height: 2)
+                    .frame(maxWidth: .infinity)
             }
 
             Text(Timecode.short(duration))

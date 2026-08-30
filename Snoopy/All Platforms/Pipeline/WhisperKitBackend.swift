@@ -239,10 +239,18 @@ actor WhisperKitBackend: TranscriptionBackend {
         let sampleRate = Double(WhisperKit.sampleRate)
         let duration = Double(samples.count) / sampleRate
 
-        let cuts = SpeechRegion.cutPoints(
+        // Diarization gaps give the rough positions; the audio decides the
+        // exact ones. A cut in the middle of a word is the only thing that
+        // makes slicing cost anything.
+        let candidates = SpeechRegion.cutPoints(
             in: request.speechRegions,
             duration: duration,
             slices: Self.sliceCount(for: duration)
+        )
+        let cuts = SpeechRegion.quietest(
+            near: candidates,
+            in: samples,
+            sampleRate: sampleRate
         )
         if Self.verboseLogging {
             print("SLICING: \(request.speechRegions.count) regions -> "

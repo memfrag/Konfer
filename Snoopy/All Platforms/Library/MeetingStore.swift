@@ -59,6 +59,7 @@ final class MeetingStore {
     func delete(_ id: UUID) {
         meetings.removeAll { $0.id == id }
         try? FileManager.default.removeItem(at: fileURL(for: id))
+        WaveformStore.removeCache(for: id)
     }
 
     // MARK: - Persistence

@@ -11,7 +11,7 @@ import Foundation
 /// meeting can outlive its audio. That case is handled when a meeting is
 /// opened, not swept for at launch.
 ///
-enum LibraryLocation {
+nonisolated enum LibraryLocation {
 
     static var directory: URL {
         let base = FileManager.default.urls(

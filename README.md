@@ -140,9 +140,24 @@ make CoreML give up with *"ANE op async execution has timed out"*. And a slice
 that fails comes back as a `Result` we inspect and surface as an error, which is
 precisely what WhisperKit's own chunker does not do.
 
-`SNOOPY_SLICES=1` restores a single pass. The cuts are drawn as ticks under the
-player, so you can see where they landed — a tick in the middle of someone
-talking would be the sign that the automatic placement needs help.
+`SNOOPY_SLICES=1` restores a single pass.
+
+Cut positions are chosen in two steps: diarization gaps give the rough places,
+then the audio itself decides the exact ones, by finding the quietest 0.3s
+window within fifteen seconds. That second step exists because the waveform view
+showed the first step wasn't reliable — one cut in three landed on a passage
+louder than the 75th percentile. After it, all three sit at or below the 25th.
+
+## The waveform
+
+The player is a waveform, coloured by who is speaking in the same colours as the
+speaker chips, so the shape of a meeting reads at a glance: who talks most,
+where the long stretches are, who only chips in. Yellow lines mark the
+transcription cuts. Click or drag anywhere to seek.
+
+Envelopes are computed once per meeting (peak amplitude, 2000 buckets) and
+cached beside the transcript, since reading an hour of audio takes a few
+seconds.
 
 ### Why the language tag matters
 
