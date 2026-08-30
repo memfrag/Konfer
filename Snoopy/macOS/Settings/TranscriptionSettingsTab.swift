@@ -40,18 +40,41 @@ struct TranscriptionSettingsTab: View {
                 Text("Speech Recognition")
             } footer: {
                 Text(
-                    "KB-Whisper is the National Library of Sweden's Whisper model, "
-                    + "trained on more than 50,000 hours of Swedish. Parakeet is "
-                    + "much faster and fine for English, but garbles Swedish. "
-                    + "A change applies to the next recording you transcribe; "
-                    + "anything already queued keeps the model it started with."
+                    "Apple's recognition covers 30 locales, and Swedish isn't "
+                    + "one of them. KB-Whisper is the National Library of "
+                    + "Sweden's Whisper model, trained on more than 50,000 hours "
+                    + "of Swedish. A change applies to the next recording you "
+                    + "transcribe; anything already queued keeps what it started "
+                    + "with."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Faster, less complete", isOn: $appSettings.fastTranscription)
+                    .onChange(of: appSettings.fastTranscription) { _, value in
+                        pipeline.fastTranscription = value
+                    }
+            } header: {
+                Text("Speed")
+            } footer: {
+                Text(
+                    "Transcribes the recording in parallel chunks, roughly twice "
+                    + "as fast. It also drops speech, and does so unpredictably: "
+                    + "the same recording produced 791, 657 and 639 words on "
+                    + "three consecutive runs, against 813 twice with this off. "
+                    + "Transcripts made this way are marked."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .onAppear { pipeline.selectedBackend = appSettings.asrBackend }
+        .onAppear {
+            pipeline.selectedBackend = appSettings.asrBackend
+            pipeline.fastTranscription = appSettings.fastTranscription
+        }
     }
 
     private var minutes: String {

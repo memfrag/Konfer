@@ -182,6 +182,11 @@ nonisolated struct Meeting: Identifiable, Codable, Hashable, Sendable {
     /// Set when a stage failed but the run was still worth keeping.
     var degraded: DegradedStage?
 
+    /// Set when this transcript was produced with fast (chunked) transcription,
+    /// which is known to drop speech. Optional so meetings written before the
+    /// setting existed still decode.
+    var wasFastTranscribed: Bool?
+
     var audioURL: URL { URL(fileURLWithPath: audioPath) }
 
     /// Whether the source recording is still where we left it. Checked when a

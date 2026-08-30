@@ -54,17 +54,15 @@ actor AppleSpeechBackend: TranscriptionBackend {
         isReady = false
     }
 
-    /// - Parameter speechRegions: Ignored. `SpeechAnalyzer` consumes the file
-    ///   itself and does its own segmentation.
+    /// `speechRegions` and `allowsChunking` are ignored: `SpeechAnalyzer`
+    /// consumes the file itself and does its own segmentation.
     func transcribe(
-        _ url: URL,
-        language: MeetingLanguage,
-        speechRegions: [SpeechRegion],
+        _ request: TranscriptionRequest,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> TranscribedAudio {
 
-        guard Self.supports(language) else {
-            throw PipelineError.languageUnsupported(language)
+        guard Self.supports(request.language) else {
+            throw PipelineError.languageUnsupported(request.language)
         }
 
         let locale = try await Self.resolvedLocale()
@@ -78,7 +76,7 @@ actor AppleSpeechBackend: TranscriptionBackend {
         )
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        let file = try AVAudioFile(forReading: url)
+        let file = try AVAudioFile(forReading: request.url)
 
         // Collect results while the analyzer consumes the file.
         let collector = Task { () -> [WordSpan] in

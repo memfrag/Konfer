@@ -12,6 +12,31 @@ nonisolated struct TranscribedAudio: Sendable {
     let words: [WordSpan]
 }
 
+// MARK: - TranscriptionRequest
+
+/// Everything a backend needs to transcribe one recording.
+///
+/// A struct rather than a parameter list because the interesting part of this
+/// app is what gets passed here, and that keeps growing.
+nonisolated struct TranscriptionRequest: Sendable {
+
+    let url: URL
+
+    /// The language the user declared for the meeting. Backends that can be
+    /// pinned to a language should honour it; Whisper in particular detects
+    /// language *per chunk* when left to itself, which on a Swedish meeting
+    /// full of English loanwords makes it flip mid-file.
+    let language: MeetingLanguage
+
+    /// Where the diarizer found speech, so a backend that chunks can cut on
+    /// real silence instead of guessing. Backends are free to ignore it.
+    let speechRegions: [SpeechRegion]
+
+    /// Whether the user has accepted a faster but incomplete transcript.
+    /// Off by default — see ``WhisperKitBackend/chunkingStrategy(allowed:)``.
+    let allowsChunking: Bool
+}
+
 // MARK: - TranscriptionBackend
 
 /// Speech recognition, behind a protocol.
@@ -38,17 +63,8 @@ nonisolated protocol TranscriptionBackend: Sendable {
     /// Releases loaded models, e.g. before deleting them from disk.
     func unload() async
 
-    /// - Parameter language: The language the user declared for the meeting.
-    ///   Backends that can be pinned to a language should honour it; Whisper in
-    ///   particular detects language *per chunk* when left to itself, which on
-    ///   a Swedish meeting full of English loanwords makes it flip mid-file.
-    /// - Parameter speechRegions: Where the diarizer found speech, so a backend
-    ///   that chunks can cut on real silence instead of guessing. Backends are
-    ///   free to ignore it.
     func transcribe(
-        _ url: URL,
-        language: MeetingLanguage,
-        speechRegions: [SpeechRegion],
+        _ request: TranscriptionRequest,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> TranscribedAudio
 }

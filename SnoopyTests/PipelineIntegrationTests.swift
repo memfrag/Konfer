@@ -76,6 +76,8 @@ struct PipelineIntegrationTests {
             speakerStore: speakerStore
         )
         pipeline.selectedBackend = Self.backend
+        pipeline.fastTranscription =
+            ProcessInfo.processInfo.environment["SNOOPY_FAST"] == "1"
         print("backend: \(Self.backend.resolved(for: Self.language).rawValue) (language: \(Self.language.rawValue))")
 
         // Sample the stage as it changes, so the run reports where the time

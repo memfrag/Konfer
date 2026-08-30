@@ -29,6 +29,7 @@ final class TranscriptionPipeline {
         /// Captured when the job is queued, so changing the setting mid-queue
         /// doesn't silently change what a waiting job will use.
         let backend: ASRBackendKind
+        let fastTranscription: Bool
     }
 
     enum Stage: Equatable {
@@ -83,6 +84,9 @@ final class TranscriptionPipeline {
     /// Which model new jobs will use. Read from settings by the caller.
     var selectedBackend: ASRBackendKind = .default
 
+    /// Whether new jobs trade completeness for speed. Read from settings.
+    var fastTranscription = false
+
     init(
         registry: BackendRegistry = BackendRegistry(),
         diarizer: DiarizationService,
@@ -107,7 +111,8 @@ final class TranscriptionPipeline {
             title: url.deletingPathExtension().lastPathComponent,
             language: language,
             expectedSpeakers: expectedSpeakers,
-            backend: selectedBackend
+            backend: selectedBackend,
+            fastTranscription: fastTranscription
         )
         queue.append(job)
         startNextIfIdle()
@@ -208,14 +213,16 @@ final class TranscriptionPipeline {
             stage = .transcribing(0)
             let transcribed: TranscribedAudio
             do {
-                transcribed = try await backend.transcribe(
-                    audio.url,
+                let request = TranscriptionRequest(
+                    url: audio.url,
                     language: job.language,
                     speechRegions: SpeechRegion.regions(
                         from: segments,
                         padding: SpeechRegion.padding
-                    )
-                ) { [weak self] fraction in
+                    ),
+                    allowsChunking: job.fastTranscription
+                )
+                transcribed = try await backend.transcribe(request) { [weak self] fraction in
                     Task { @MainActor in self?.stage = .transcribing(fraction) }
                 }
             } catch is CancellationError {
@@ -241,7 +248,8 @@ final class TranscriptionPipeline {
                 language: job.language,
                 speakers: speakerStore.annotate(speakers),
                 utterances: utterances,
-                degraded: degraded
+                degraded: degraded,
+                wasFastTranscribed: job.fastTranscription ? true : nil
             )
             meetingStore.add(meeting)
             lastFinishedMeetingID = meeting.id

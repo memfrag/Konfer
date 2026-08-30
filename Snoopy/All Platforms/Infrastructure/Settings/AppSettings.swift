@@ -25,6 +25,9 @@ import KeyValueStore
 
         /// Which speech recognition model to transcribe with.
         case asrBackend
+
+        /// Whether to trade completeness for speed when transcribing.
+        case fastTranscription
     }
 
     // MARK: Properties
@@ -47,6 +50,17 @@ import KeyValueStore
         }
     }
 
+    /// Transcribe in parallel chunks: roughly twice as fast, and incomplete.
+    ///
+    /// Off by default. Chunked transcription drops speech and, worse, does so
+    /// non-deterministically — the same recording produced 791, 657 and 639
+    /// words on three consecutive runs, against 813 twice when unchunked.
+    public var fastTranscription: Bool {
+        didSet {
+            store.save(fastTranscription, for: .fastTranscription)
+        }
+    }
+
     // MARK: Setup
 
     /// The key–value store that backs this settings container.
@@ -62,6 +76,7 @@ import KeyValueStore
         self.store = store ?? .defaultStore
         colorScheme = self.store.load(.colorScheme, default: .system)
         
+        fastTranscription = self.store.load(.fastTranscription, default: false)
         asrBackend = ASRBackendKind(
             rawValue: self.store.load(.asrBackend, default: ASRBackendKind.default.rawValue)
         ) ?? .default

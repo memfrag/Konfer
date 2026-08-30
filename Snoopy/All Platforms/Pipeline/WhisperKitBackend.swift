@@ -61,10 +61,14 @@ actor WhisperKitBackend: TranscriptionBackend {
     /// ``DiarizationVAD`` fixes the *detector* — it beats energy thresholding
     /// comfortably — but it cannot fix that. A meeting transcript that differs
     /// each time you produce it is not worth halving the wait for, so chunking
-    /// stays off. `SNOOPY_CHUNKING=vad` re-enables it for comparison runs.
-    nonisolated static func chunkingStrategy(hasSpeechRegions: Bool) -> ChunkingStrategy {
-        ProcessInfo.processInfo.environment["SNOOPY_CHUNKING"]
-            .flatMap(ChunkingStrategy.init(rawValue:)) ?? .none
+    /// stays off unless the user opts in via Settings ▸ Transcription.
+    /// `SNOOPY_CHUNKING` overrides both, for comparison runs.
+    nonisolated static func chunkingStrategy(allowed: Bool) -> ChunkingStrategy {
+        if let override = ProcessInfo.processInfo.environment["SNOOPY_CHUNKING"]
+            .flatMap(ChunkingStrategy.init(rawValue:)) {
+            return override
+        }
+        return allowed ? .vad : .none
     }
 
     /// The VAD used when chunking is on.
@@ -120,22 +124,18 @@ actor WhisperKitBackend: TranscriptionBackend {
     }
 
     func transcribe(
-        _ url: URL,
-        language: MeetingLanguage,
-        speechRegions: [SpeechRegion],
+        _ request: TranscriptionRequest,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> TranscribedAudio {
 
         guard let whisperKit else { throw PipelineError.modelsNotLoaded }
 
-        // Chunking is only safe when we can tell it where the speech actually
-        // is. With the diarizer's segmentation in hand we can chunk (and so use
-        // WhisperKit's 16 concurrent workers); without it we transcribe the
-        // file in one pass rather than let an energy threshold guess.
-        let strategy = Self.chunkingStrategy(hasSpeechRegions: !speechRegions.isEmpty)
-        whisperKit.voiceActivityDetector = speechRegions.isEmpty
+        // If the user has opted into chunking, at least chunk on the diarizer's
+        // segmentation rather than on an energy threshold.
+        let strategy = Self.chunkingStrategy(allowed: request.allowsChunking)
+        whisperKit.voiceActivityDetector = request.speechRegions.isEmpty
             ? nil
-            : DiarizationVAD(regions: speechRegions)
+            : DiarizationVAD(regions: request.speechRegions)
 
         // Pinning the language matters more than it looks. Left to detect,
         // Whisper decides per VAD chunk, and a Swedish meeting sprinkled with
@@ -146,13 +146,13 @@ actor WhisperKitBackend: TranscriptionBackend {
         let options = DecodingOptions(
             verbose: false,
             task: .transcribe,
-            language: Self.whisperLanguage(for: language),
+            language: Self.whisperLanguage(for: request.language),
             wordTimestamps: true,
             chunkingStrategy: strategy
         )
 
         let results = try await whisperKit.transcribe(
-            audioPath: url.path,
+            audioPath: request.url.path,
             decodeOptions: options
         )
 

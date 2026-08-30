@@ -73,6 +73,18 @@ struct MeetingPane: View {
                 )
             }
 
+            if meeting.wasFastTranscribed == true {
+                Banner(
+                    icon: "hare",
+                    tint: .orange,
+                    title: "Transcribed in fast mode",
+                    message: "This transcript was produced with chunked "
+                        + "transcription, which drops some speech. Turn off "
+                        + "\"Faster, less complete\" in Settings and transcribe "
+                        + "again for a complete version."
+                )
+            }
+
             if !meeting.audioExists {
                 Banner(
                     icon: "waveform.slash",
