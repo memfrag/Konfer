@@ -59,25 +59,38 @@ struct Sidebar: View {
     private var sidebarList: some View {
         List(selection: $selection) {
 
-            if !filteredMeetings.isEmpty {
-                Section("Meetings") {
-                    ForEach(filteredMeetings) { meeting in
-                        NavigationLink(value: SidebarSelection.meeting(meeting.id)) {
-                            MeetingRow(meeting: meeting)
+            // Always present, even with nothing in it, so the button that adds
+            // the first meeting has somewhere to live.
+            Section {
+                ForEach(filteredMeetings) { meeting in
+                    NavigationLink(value: SidebarSelection.meeting(meeting.id)) {
+                        MeetingRow(meeting: meeting)
+                    }
+                    .contextMenu {
+                        Button("Reveal Audio in Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
                         }
-                        .contextMenu {
-                            Button("Reveal Audio in Finder") {
-                                NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
-                            }
-                            .disabled(!meeting.audioExists)
+                        .disabled(!meeting.audioExists)
 
-                            Divider()
+                        Divider()
 
-                            Button("Delete", role: .destructive) {
-                                meetingStore.delete(meeting.id)
-                            }
+                        Button("Delete", role: .destructive) {
+                            meetingStore.delete(meeting.id)
                         }
                     }
+                }
+            } header: {
+                HStack(spacing: 4) {
+                    Text("Meetings")
+                    Spacer()
+                    Button {
+                        isShowingImporter = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Transcribe a recording")
                 }
             }
 
@@ -101,14 +114,6 @@ struct Sidebar: View {
                     Label("Record", systemImage: "record.circle")
                 }
                 .help("Record a meeting")
-            }
-            ToolbarItem {
-                Button {
-                    isShowingImporter = true
-                } label: {
-                    Label("Transcribe Recording…", systemImage: "plus")
-                }
-                .help("Transcribe a recording")
             }
         }
     }
