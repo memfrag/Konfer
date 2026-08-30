@@ -45,6 +45,22 @@ covered English better than it did.
 Settings ▸ Transcription picks the model. **Automatic** — the default — sends
 English to Apple and everything else to KB-Whisper Large.
 
+## What a real meeting costs
+
+A 1 h 17 m Swedish meeting on an M3 Ultra, KB-Whisper Large, models already
+downloaded:
+
+| Stage | Time |
+|---|---|
+| Diarization | 28.9 s |
+| Transcription | 1359.7 s |
+| **Total** | **25 min — 3× real time** |
+
+12,418 words across 353 turns and 6 speakers, covering 88% of the recording's
+duration. Peak memory about 1.4 GB.
+
+Transcription dominates, and that is a deliberate trade — see below.
+
 ## Models
 
 Downloaded once, on the first transcription:
@@ -58,6 +74,27 @@ Downloaded once, on the first transcription:
 
 Settings ▸ Models shows the sizes and deletes them; the next run downloads them
 again. Every run after the first is fully offline.
+
+### Why transcription isn't chunked
+
+WhisperKit defaults to splitting a file on silence (`chunkingStrategy: .vad`)
+and decoding the chunks concurrently. Snoopy turns that off. Measured on five
+minutes of a real Swedish meeting:
+
+| Strategy | Words | Speech covered | Time |
+|---|---|---|---|
+| `.vad` (WhisperKit default) | 606 | 66% | 33 s |
+| `.none` (Snoopy) | **813** | **86%** | 93 s |
+
+On the full hour the same setting gives 88% coverage.
+
+VAD chunking loses about a quarter of the speech — chunks clip quiet speech at
+the seams, and a chunk that fails to decode is dropped with nothing but a debug
+log. Tuning the detector makes it *worse*: a more sensitive threshold produces
+more chunks and so more seams (507 words at threshold 0.005, 583 at 0.002).
+
+Transcription is a background job you walk away from, so three times the wall
+clock beats a quarter of the meeting going silently missing.
 
 ### Why the language tag matters
 

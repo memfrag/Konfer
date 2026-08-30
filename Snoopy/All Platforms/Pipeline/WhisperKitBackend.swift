@@ -37,6 +37,46 @@ actor WhisperKitBackend: TranscriptionBackend {
         }
     }
 
+    /// How WhisperKit splits the file before transcribing.
+    ///
+    /// `.none`, deliberately, even though `.vad` is WhisperKit's default and
+    /// roughly three times faster. Measured on five minutes of a real Swedish
+    /// meeting:
+    ///
+    /// | Strategy | Words | Speech covered | Time |
+    /// |----------|-------|----------------|------|
+    /// | `.vad`   |   606 |            66% |  33s |
+    /// | `.none`  |   813 |            86% |  93s |
+    ///
+    /// VAD chunking loses about a quarter of the speech. Two mechanisms:
+    /// chunks are cut on silence and clip quiet speech at the seams, and a
+    /// chunk that fails to decode is dropped with nothing but a debug log
+    /// (`AudioChunker.updateSeekOffsetsForResults`). Tuning the detector makes
+    /// it worse rather than better — a more sensitive threshold produces more
+    /// chunks, and so more seams (507 words at 0.005/0.2, 583 at 0.002/0.4).
+    ///
+    /// Transcription is a background job you walk away from, so three times
+    /// the wall clock is a much better trade than a quarter of the meeting
+    /// silently missing. Override with `SNOOPY_CHUNKING=none|vad`.
+    nonisolated static var chunkingStrategy: ChunkingStrategy {
+        ProcessInfo.processInfo.environment["SNOOPY_CHUNKING"]
+            .flatMap(ChunkingStrategy.init(rawValue:)) ?? .none
+    }
+
+    /// The VAD used when chunking is on.
+    ///
+    /// WhisperKit's default `EnergyVAD` uses a 0.02 energy threshold and *no*
+    /// frame overlap, and its own documentation says overlap is what "catches
+    /// audio that starts exactly at chunk boundaries". On far-field meeting
+    /// audio the default clips quiet speech at the seams.
+    nonisolated static var voiceActivityDetector: VoiceActivityDetector? {
+        let environment = ProcessInfo.processInfo.environment
+        guard let threshold = environment["SNOOPY_VAD_THRESHOLD"].flatMap(Float.init)
+        else { return nil }
+        let overlap = environment["SNOOPY_VAD_OVERLAP"].flatMap(Float.init) ?? 0
+        return EnergyVAD(frameLength: 0.1, frameOverlap: overlap, energyThreshold: threshold)
+    }
+
     /// `SNOOPY_WHISPER_VERBOSE=1` turns on WhisperKit's own logging, which is
     /// the only way to see where a slow first load is actually spending time.
     nonisolated static var verboseLogging: Bool {
@@ -61,6 +101,7 @@ actor WhisperKitBackend: TranscriptionBackend {
         let config = WhisperKitConfig(
             modelFolder: KBWhisperModelStore.directory(for: variant).path,
             tokenizerFolder: KBWhisperModelStore.directory,
+            voiceActivityDetector: Self.voiceActivityDetector,
             verbose: Self.verboseLogging,
             logLevel: Self.verboseLogging ? .debug : .error,
             prewarm: false,
@@ -93,7 +134,7 @@ actor WhisperKitBackend: TranscriptionBackend {
             task: .transcribe,
             language: Self.whisperLanguage(for: language),
             wordTimestamps: true,
-            chunkingStrategy: .vad
+            chunkingStrategy: Self.chunkingStrategy
         )
 
         let results = try await whisperKit.transcribe(

@@ -131,6 +131,14 @@ struct PipelineIntegrationTests {
             totalSeconds,
             meeting.duration / max(totalSeconds, 0.001)
         ))
+        let words = meeting.utterances.flatMap { $0.words ?? [] }
+        let spoken = words.reduce(0.0) { $0 + ($1.end - $1.start) }
+        let covered = meeting.utterances.reduce(0.0) { $0 + $1.duration }
+        print(String(
+            format: "words: %d  word-seconds: %.0f  turn-seconds: %.0f of %.0f (%.0f%%)",
+            words.count, spoken, covered, meeting.duration,
+            covered / max(meeting.duration, 1) * 100
+        ))
         print("--- \(meeting.speakers.count) speakers, \(meeting.utterances.count) turns ---")
         print(TranscriptExporter.markdown(for: meeting))
     }
