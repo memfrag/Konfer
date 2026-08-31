@@ -14,3 +14,6 @@ xcuserdata/
 # Sparkle signing material must never be committed.
 *.p12
 private-key*
+
+# Downloaded by scripts/build-and-notarize.sh.
+Sparkle-tools/
