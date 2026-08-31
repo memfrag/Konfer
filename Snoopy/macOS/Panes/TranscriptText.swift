@@ -103,9 +103,21 @@ struct TranscriptText: View {
     let searchMatches: [TranscriptMatch]
     let currentSearchMatch: TranscriptMatch?
 
+    /// Whether clicking a word should also offer what can be done at it.
+    ///
+    /// False while the audio is playing: the click is then a seek and nothing
+    /// more, because a popover chasing the playhead would be in the way.
+    let offersActions: Bool
+
     let onSeek: (TimeInterval) -> Void
 
+    /// Splits the turn before the word at this index.
+    let onSplitBefore: (Int) -> Void
+
     @State private var hovered: Int?
+
+    /// The token whose popover is open, if any.
+    @State private var actionToken: WordToken.ID?
 
     var body: some View {
         WrappingLines(spacing: 0, lineSpacing: 2) {
@@ -121,11 +133,54 @@ struct TranscriptText: View {
                     .onHover { isInside in
                         hovered = isInside ? token.id : (hovered == token.id ? nil : hovered)
                     }
-                    .onTapGesture { onSeek(token.start) }
+                    .onTapGesture {
+                        onSeek(token.start)
+                        actionToken = offersActions ? token.id : nil
+                    }
+                    .popover(
+                        isPresented: Binding(
+                            get: { actionToken == token.id },
+                            set: { if !$0, actionToken == token.id { actionToken = nil } }
+                        ),
+                        arrowEdge: .bottom
+                    ) {
+                        actions(at: token)
+                    }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Play from here")
             }
         }
+    }
+
+    /// What can be done at the word just clicked.
+    ///
+    /// The playhead is already there — clicking moved it — so "before this
+    /// word" and "at the playhead" name the same place.
+    @ViewBuilder private func actions(at token: WordToken) -> some View {
+        let wordIndex = token.range.lowerBound
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                actionToken = nil
+                onSplitBefore(wordIndex)
+            } label: {
+                Label("Split before word", systemImage: "text.insert")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            // Nothing precedes the first word, so there is nothing to split off.
+            .disabled(wordIndex == 0)
+
+            if wordIndex == 0 {
+                Text("This is the first word of the turn.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+            }
+        }
+        .frame(minWidth: 180)
     }
 
     private func isActive(_ token: WordToken) -> Bool {

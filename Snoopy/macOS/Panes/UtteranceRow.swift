@@ -17,6 +17,9 @@ struct UtteranceRow: View {
     /// Search matches inside this turn, and which of them the find bar is on.
     let searchMatches: [TranscriptMatch]
     let currentSearchMatch: TranscriptMatch?
+
+    /// Whether clicking a word should offer what can be done at it.
+    let offersWordActions: Bool
     let otherSpeakers: [SpeakerLabel]
 
     /// False at the ends of the transcript, where there is no neighbour.
@@ -29,22 +32,21 @@ struct UtteranceRow: View {
     let onEdit: (String) -> Void
     let onReassign: (String) -> Void
     let onSplit: () -> Void
+    /// Splits this turn before the word at the given index.
+    let onSplitBefore: (Int) -> Void
     let onMerge: (MergeDirection) -> Void
 
     @State private var isEditing = false
     @State private var draft = ""
 
+    /// Whether the pointer is over this turn, which is when the merge buttons
+    /// in the margin become available.
+    @State private var isHovering = false
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
 
-            Button(action: onSeek) {
-                Text(Timecode.short(utterance.start))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
-            }
-            .buttonStyle(.plain)
-            .frame(width: 56, alignment: .trailing)
-            .help("Jump to this point")
+            margin
 
             Rectangle()
                 .fill(color)
@@ -71,7 +73,75 @@ struct UtteranceRow: View {
         }
         .padding(.vertical, 5)
         .contentShape(Rectangle())
+        .onHover { hover in
+            withAnimation {
+                isHovering = hover
+            }
+        }
         .contextMenu { menu }
+    }
+
+    // MARK: - Margin
+
+    /// The time, and what can be done to this turn's edges.
+    ///
+    /// The merge buttons live here because this is where the boundary between
+    /// two turns actually is — the diarizer breaking one turn into two is a
+    /// mistake you see in the left margin, as a second timestamp where none
+    /// should be.
+    private var margin: some View {
+        VStack(alignment: .trailing, spacing: 3) {
+            Button(action: onSeek) {
+                Text(Timecode.short(utterance.start))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Jump to this point")
+
+            Spacer()
+
+            HStack(spacing: 2) {
+                mergeButton(
+                    .previous,
+                    systemImage: "arrow.up.to.line.circle.fill",
+                    isEnabled: canMergePrevious,
+                    help: "Merge with the turn above"
+                )
+                mergeButton(
+                    .next,
+                    systemImage: "arrow.down.to.line.circle.fill",
+                    isEnabled: canMergeNext,
+                    help: "Merge with the turn below"
+                )
+            }
+            // Always laid out, only ever shown on hover: appearing on hover is
+            // helpful, but a transcript whose lines jump as the pointer crosses
+            // them is not.
+            .opacity(isHovering ? 1 : 0)
+            .allowsHitTesting(isHovering)
+        }
+        .frame(width: 56, alignment: .trailing)
+    }
+
+    private func mergeButton(
+        _ direction: MergeDirection,
+        systemImage: String,
+        isEnabled: Bool,
+        help: String
+    ) -> some View {
+        Button {
+            onMerge(direction)
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 18, height: 18)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .disabled(!isEnabled)
+        .help(help)
     }
 
     // MARK: - Speaker
@@ -125,7 +195,9 @@ struct UtteranceRow: View {
                 activeWordIndex: isActive ? activeWordIndex : nil,
                 searchMatches: searchMatches,
                 currentSearchMatch: currentSearchMatch,
-                onSeek: onSeekTo
+                offersActions: offersWordActions,
+                onSeek: onSeekTo,
+                onSplitBefore: onSplitBefore
             )
         } else {
             // An edited turn has no word timings left, so the whole line seeks

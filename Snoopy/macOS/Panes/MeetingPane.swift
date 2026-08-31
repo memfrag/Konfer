@@ -183,6 +183,7 @@ struct MeetingPane: View {
                         currentSearchMatch: find.current?.utteranceID == utterance.id
                             ? find.current
                             : nil,
+                        offersWordActions: !player.isPlaying,
                         otherSpeakers: meeting.speakers.filter { $0.id != utterance.speakerId },
                         canMergePrevious: index > 0,
                         canMergeNext: index + 1 < meeting.utterances.count,
@@ -195,6 +196,11 @@ struct MeetingPane: View {
                             meetingStore.modify(meetingID) { $0.reassign(utterance.id, to: speakerId) }
                         },
                         onSplit: { split(utterance) },
+                        onSplitBefore: { wordIndex in
+                            meetingStore.modify(meetingID) {
+                                $0.splitUtterance(utterance.id, atWordIndex: wordIndex)
+                            }
+                        },
                         onMerge: { direction in
                             meetingStore.modify(meetingID) {
                                 $0.mergeUtterance(utterance.id, with: direction)
