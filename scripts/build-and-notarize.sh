@@ -11,7 +11,11 @@ set -euo pipefail
 #   - Sparkle EdDSA keys in keychain (run: ./Sparkle-tools/bin/generate_keys)
 #
 # Usage:
-#   ./scripts/build-and-notarize.sh
+#   ./scripts/build-and-notarize.sh [--version 1.2.0] [--title "Konfer 1.2.0"]
+#
+# Both values are prompted for when omitted and a terminal is attached, and
+# required as arguments when one is not, so the same script serves a release cut
+# by hand and one cut by a machine.
 # -----------------------------------------------------------------------------
 
 # --- Constants ---
@@ -36,6 +40,54 @@ error() {
     echo "ERROR: $1" >&2
     exit 1
 }
+
+usage() {
+    cat <<USAGE
+Usage: $(basename "$0") [options]
+
+  --version <x.y.z>   Version to release. Prompted for when omitted.
+  --title <text>      GitHub release title. Defaults to "$APP_NAME <version>".
+  -h, --help          This.
+
+With no arguments and a terminal attached, both are prompted for as before.
+USAGE
+}
+
+# --- Arguments ---
+VERSION_ARG=""
+TITLE_ARG=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --version) [ $# -ge 2 ] || error "--version needs a value."; VERSION_ARG="$2"; shift 2 ;;
+        --version=*) VERSION_ARG="${1#*=}"; shift ;;
+        --title) [ $# -ge 2 ] || error "--title needs a value."; TITLE_ARG="$2"; shift 2 ;;
+        --title=*) TITLE_ARG="${1#*=}"; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) usage >&2; error "Unknown option: $1" ;;
+    esac
+done
+
+# Whether there is anyone to ask.
+if [ -t 0 ]; then INTERACTIVE=true; else INTERACTIVE=false; fi
+
+# --- Preflight ---
+# Everything the run needs but would not miss until the end. Notarization is
+# forty minutes of archiving away from the start, and finding out there is no
+# credential for it then is the whole reason this section exists.
+echo "==> Checking prerequisites..."
+
+xcrun notarytool history --keychain-profile "$KEYCHAIN_PROFILE" >/dev/null 2>&1 \
+    || error "No notarytool credentials for profile '$KEYCHAIN_PROFILE'. Run:
+    xcrun notarytool store-credentials '$KEYCHAIN_PROFILE' --apple-id <id> --team-id <team>"
+
+gh auth status >/dev/null 2>&1 \
+    || error "gh is not authenticated. Run: gh auth login"
+
+security find-generic-password -s "https://sparkle-project.org" >/dev/null 2>&1 \
+    || error "No Sparkle EdDSA key in the keychain. Run: ./Sparkle-tools/bin/generate_keys"
+
+echo "    Notarization, GitHub and Sparkle signing are all set up."
 
 # --- Clean and create build directory ---
 echo "==> Cleaning build directory..."
@@ -64,24 +116,37 @@ if [ -n "$LATEST_TAG" ]; then
 fi
 
 NEED_NEW_VERSION=false
-if [ -z "$LATEST_TAG" ]; then
-    echo "    No existing releases found."
-    read -rp "    Enter version to release [$CURRENT_VERSION]: " VERSION
-    VERSION="${VERSION:-$CURRENT_VERSION}"
-else
-    if [ "$CURRENT_VERSION" = "$LATEST_TAG" ]; then
-        NEED_NEW_VERSION=true
-        echo "    Current version matches latest release."
-    fi
+if [ -n "$LATEST_TAG" ] && [ "$CURRENT_VERSION" = "$LATEST_TAG" ]; then
+    NEED_NEW_VERSION=true
+    echo "    Current version matches the latest release, so it has to go up."
+fi
+
+if [ -n "$VERSION_ARG" ]; then
+    VERSION="$VERSION_ARG"
+elif [ "$INTERACTIVE" = true ]; then
     if [ "$NEED_NEW_VERSION" = true ]; then
         read -rp "    Enter new version: " VERSION
-        if [ -z "$VERSION" ]; then
-            error "Version cannot be empty."
-        fi
+        [ -n "$VERSION" ] || error "Version cannot be empty."
     else
         read -rp "    Enter version to release [$CURRENT_VERSION]: " VERSION
         VERSION="${VERSION:-$CURRENT_VERSION}"
     fi
+elif [ "$NEED_NEW_VERSION" = true ]; then
+    # Reusing the released version would be wrong, and there is nobody to ask.
+    error "$CURRENT_VERSION is already released. Pass --version <x.y.z>."
+else
+    VERSION="$CURRENT_VERSION"
+    echo "    No --version given; releasing $VERSION."
+fi
+
+case "$VERSION" in
+    ""|*[![:alnum:].+-]*) error "Version '$VERSION' should look like 1.2.0." ;;
+esac
+
+# Cheaper to refuse now than after notarization, which is where the clash would
+# otherwise surface.
+if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+    error "Tag $VERSION already exists."
 fi
 
 if [ "$VERSION" != "$CURRENT_VERSION" ]; then
@@ -168,11 +233,13 @@ echo "    Stapled."
 echo "==> Checking Sparkle signing key..."
 "$SPARKLE_TOOLS_DIR/bin/sign_update" "$DMG_PATH" || error "Sparkle signing failed."
 
-# --- Prompt for release title ---
-read -rp "==> Enter release title: " RELEASE_TITLE
-if [ -z "$RELEASE_TITLE" ]; then
-    RELEASE_TITLE="$APP_NAME $VERSION"
+# --- Release title ---
+if [ -n "$TITLE_ARG" ]; then
+    RELEASE_TITLE="$TITLE_ARG"
+elif [ "$INTERACTIVE" = true ]; then
+    read -rp "==> Enter release title [$APP_NAME $VERSION]: " RELEASE_TITLE
 fi
+RELEASE_TITLE="${RELEASE_TITLE:-$APP_NAME $VERSION}"
 
 # --- Create GitHub release ---
 echo "==> Creating GitHub release..."

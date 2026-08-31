@@ -64,8 +64,17 @@ There is no SwiftLint config in the repo, but the sources carry
 
 `scripts/build-and-notarize.sh` archives the `Konfer (Release)` scheme, notarizes,
 builds a DMG, signs for Sparkle, publishes a GitHub release and updates
-`appcast.xml`. It expects `xcrun notarytool store-credentials 'notary'`,
-`gh auth login`, and Sparkle EdDSA keys in the keychain.
+`appcast.xml`.
+
+```sh
+./scripts/build-and-notarize.sh --version 1.2.0 --title "Konfer 1.2.0"
+```
+
+Both values are prompted for when omitted and a terminal is attached, and
+required when one is not, so the same script serves a release cut by hand and
+one cut by CI. It refuses up front — before archiving anything — if the
+notarytool profile, `gh` auth or the Sparkle key is missing, or if the tag
+already exists; each of those otherwise surfaces at the end, after the build.
 
 The version lives in the build settings, not in `Info.plist`: the target sets
 `GENERATE_INFOPLIST_FILE = YES`, so `CFBundleShortVersionString` and
