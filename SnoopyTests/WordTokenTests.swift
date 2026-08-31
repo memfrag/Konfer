@@ -81,6 +81,66 @@ struct WordTokenTests {
         #expect(tokens.map(\.text) == ["Hej", "du"])
     }
 
+    // MARK: - Which word is highlighted
+
+    /// Word timings abut: one word's end is the next word's start, for 85–95%
+    /// of adjacent pairs in real transcripts. Clicking a word used to seek a
+    /// fraction before it — `CMTime` rounding to the nearest 1/600 s landed
+    /// nearly a third of word starts up to 0.8 ms early — and the lookup then
+    /// reported the *previous* word, because it also matched.
+
+    @Test("The word starting at this exact instant wins over the one ending at it")
+    func boundaryPrefersTheWordJustReached() {
+        let words = [
+            WordSpan(word: "one", start: 0, end: 1),
+            WordSpan(word: "two", start: 1, end: 2),
+        ]
+        #expect(WordToken.activeIndex(in: words, at: 1) == 1)
+    }
+
+    @Test("Clicking a word highlights that word, not its predecessor")
+    func clickingAWordHighlightsIt() {
+        let words = (0..<5).map {
+            WordSpan(word: "w\($0)", start: Double($0) * 0.5, end: Double($0 + 1) * 0.5)
+        }
+        for (index, word) in words.enumerated() {
+            #expect(WordToken.activeIndex(in: words, at: word.start) == index)
+        }
+    }
+
+    @Test("A word is still the active one partway through it")
+    func midWordStaysOnTheWord() {
+        let words = [
+            WordSpan(word: "one", start: 0, end: 1),
+            WordSpan(word: "two", start: 1, end: 2),
+        ]
+        #expect(WordToken.activeIndex(in: words, at: 0.5) == 0)
+        #expect(WordToken.activeIndex(in: words, at: 1.9) == 1)
+    }
+
+    @Test("A word with no duration can still be reached")
+    func zeroLengthWordIsReachable() {
+        // The models emit a few of these per hour — 43 in one real Danish
+        // transcript — and a strictly-inside test could never match them.
+        let words = [
+            WordSpan(word: "one", start: 0, end: 1),
+            WordSpan(word: "blip", start: 1, end: 1),
+            WordSpan(word: "two", start: 2, end: 3),
+        ]
+        #expect(WordToken.activeIndex(in: words, at: 1) == 1)
+    }
+
+    @Test("Nothing is highlighted before the first word or in a gap")
+    func gapsHighlightNothing() {
+        let words = [
+            WordSpan(word: "one", start: 1, end: 2),
+            WordSpan(word: "two", start: 5, end: 6),
+        ]
+        #expect(WordToken.activeIndex(in: words, at: 0.5) == nil)
+        #expect(WordToken.activeIndex(in: words, at: 3) == nil)
+        #expect(WordToken.activeIndex(in: words, at: 9) == nil)
+    }
+
     @Test("No words means no tokens")
     func noWordsMeansNoTokens() {
         #expect(WordToken.tokens(from: []).isEmpty)

@@ -69,13 +69,37 @@ final class PlayerController {
         isPlaying = false
     }
 
+    /// Moves the playhead, never landing before the moment asked for.
+    ///
+    /// `CMTime(seconds:preferredTimescale:)` rounds to the nearest tick, and at
+    /// 600 ticks a second that put nearly a third of word starts up to 0.8 ms
+    /// *early*. Word timings are contiguous — one word's end is the next word's
+    /// start — so landing early means landing inside the previous word, which
+    /// is what made clicking a word highlight the one before it. Rounding up at
+    /// a fine timescale keeps the playhead inside the word that was clicked.
     func seek(to time: TimeInterval) {
         guard let player else { return }
-        currentTime = time
+        let target = max(0, time)
+        currentTime = target
         player.seek(
-            to: CMTime(seconds: max(0, time), preferredTimescale: 600),
+            to: Self.seekTime(for: target),
             toleranceBefore: .zero,
             toleranceAfter: .zero
         )
     }
+
+    /// The playhead position for a moment, never earlier than the moment itself.
+    ///
+    /// Rounds up, because rounding to the nearest tick is what caused the bug
+    /// this exists to prevent: measured across three real transcripts, 28.8% of
+    /// word starts landed up to 0.8 ms early at 600 ticks a second.
+    nonisolated static func seekTime(for time: TimeInterval) -> CMTime {
+        CMTime(
+            value: Int64((max(0, time) * Double(timescale)).rounded(.up)),
+            timescale: timescale
+        )
+    }
+
+    /// Fine enough that rounding up overshoots by at most 23 microseconds.
+    nonisolated static let timescale: CMTimeScale = 44_100
 }

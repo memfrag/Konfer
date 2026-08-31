@@ -22,6 +22,24 @@ struct WordToken: Identifiable {
     /// The word indices this token covers, for matching the playback highlight.
     let range: Range<Int>
 
+    /// The word being spoken at a given moment, or nil between words.
+    ///
+    /// `last`, not `first`: word timings abut, so at the exact instant a word
+    /// begins both it and the one before it can qualify — the previous word's
+    /// end and this word's start are the same number. The word just reached is
+    /// the one meant, which is what makes clicking a word highlight *that*
+    /// word.
+    static func activeIndex(in words: [WordSpan], at time: TimeInterval) -> Int? {
+        words.lastIndex {
+            // A word with no duration — the models emit a few per hour — would
+            // otherwise never match at all, so give it a brief window.
+            time >= $0.start && time < max($0.end, $0.start + minimumWordWindow)
+        }
+    }
+
+    /// Long enough to be reachable, short enough to be imperceptible.
+    private static let minimumWordWindow: TimeInterval = 0.01
+
     static func tokens(from words: [WordSpan]) -> [WordToken] {
         var tokens: [WordToken] = []
 

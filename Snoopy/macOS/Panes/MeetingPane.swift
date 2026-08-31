@@ -213,7 +213,7 @@ struct MeetingPane: View {
     /// The word being spoken, where word timings survived the editing.
     private func activeWordIndex(in utterance: Utterance) -> Int? {
         guard let words = utterance.words else { return nil }
-        return words.firstIndex { player.currentTime >= $0.start && player.currentTime < $0.end }
+        return WordToken.activeIndex(in: words, at: player.currentTime)
     }
 
     /// Who speaks when, in the same colours as the chips above the transcript.
