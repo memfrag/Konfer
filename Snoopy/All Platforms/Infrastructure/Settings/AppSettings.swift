@@ -28,6 +28,9 @@ import KeyValueStore
 
         /// Where new recordings are saved.
         case recordingFolder
+
+        /// Whether the first-run screen has been shown.
+        case hasCompletedOnboarding
     }
 
     // MARK: Properties
@@ -57,6 +60,17 @@ import KeyValueStore
         }
     }
 
+    /// Whether the welcome screen has been through once.
+    ///
+    /// Set when the user downloads or skips, so it is shown exactly once —
+    /// including to someone who skips, since a first-run screen that keeps
+    /// coming back is worse than no first-run screen.
+    public var hasCompletedOnboarding: Bool {
+        didSet {
+            store.save(hasCompletedOnboarding, for: .hasCompletedOnboarding)
+        }
+    }
+
     // MARK: Setup
 
     /// The key–value store that backs this settings container.
@@ -74,5 +88,6 @@ import KeyValueStore
         
         fastTranscription = self.store.load(.fastTranscription, default: false)
         recordingFolder = self.store.load(.recordingFolder, default: "")
+        hasCompletedOnboarding = self.store.load(.hasCompletedOnboarding, default: false)
     }
 }

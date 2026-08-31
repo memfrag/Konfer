@@ -4,6 +4,7 @@
 
 import Testing
 import Foundation
+import Speech
 @testable import Snoopy
 
 /// The language is the one thing the user declares, and everything else follows
@@ -50,9 +51,14 @@ struct MeetingLanguageTests {
 
     // MARK: - Tests
 
-    @Test("The picker offers Swedish and English, and nothing else")
-    func casesAreExplicitLanguagesOnly() {
-        #expect(MeetingLanguage.allCases == [.swedish, .english])
+    @Test("The picker offers ten languages, in the order it should show them")
+    func casesAreExplicitLanguagesInPickerOrder() {
+        // Order is deliberate and user-visible: the two Snoopy was built for,
+        // then the three it grew for, then the ones Apple already covered.
+        #expect(MeetingLanguage.allCases == [
+            .english, .swedish, .danish, .dutch, .polish,
+            .german, .spanish, .french, .italian, .portuguese,
+        ])
     }
 
     @Test("A meeting stored as auto reads back as Swedish, the language it ran as")
@@ -74,14 +80,51 @@ struct MeetingLanguageTests {
         #expect(try decoded(data).language == .swedish)
     }
 
-    @Test("English is transcribed by Apple's own recognition")
-    func englishUsesAppleSpeech() {
-        #expect(ASRBackendKind(transcribing: .english) == .appleSpeech)
-    }
-
-    @Test("Swedish is transcribed by KB-Whisper Large")
+    @Test("Swedish is transcribed by KB-Whisper Large, the model trained for it")
     func swedishUsesKBWhisperLarge() {
         #expect(ASRBackendKind(transcribing: .swedish) == .kbWhisperLarge)
+    }
+
+    @Test(
+        "The languages Apple covers go to Apple",
+        arguments: [MeetingLanguage.english, .german, .spanish, .french, .italian, .portuguese]
+    )
+    func appleLanguagesUseAppleSpeech(_ language: MeetingLanguage) {
+        #expect(ASRBackendKind(transcribing: language) == .appleSpeech)
+    }
+
+    @Test(
+        "The languages nothing else covers go to stock Whisper",
+        arguments: [MeetingLanguage.danish, .dutch, .polish]
+    )
+    func unservedLanguagesUseWhisperLargeV3(_ language: MeetingLanguage) {
+        #expect(ASRBackendKind(transcribing: language) == .whisperLargeV3)
+    }
+
+    @Test("Apple is never handed a language it has no locale for")
+    func appleIsNeverGivenAnUnsupportedLanguage() async {
+        let supported = await SpeechTranscriber.supportedLocales
+            .compactMap { $0.language.languageCode?.identifier }
+        for language in MeetingLanguage.allCases
+        where ASRBackendKind(transcribing: language) == .appleSpeech {
+            #expect(supported.contains(language.code))
+        }
+    }
+
+    @Test("Every Apple language resolves to a locale of that same language")
+    func resolvedLocaleMatchesTheLanguage() async throws {
+        for language in MeetingLanguage.allCases
+        where ASRBackendKind(transcribing: language) == .appleSpeech {
+            let locale = try await AppleSpeechBackend.resolvedLocale(for: language)
+            #expect(locale.language.languageCode?.identifier == language.code)
+        }
+    }
+
+    @Test("A language Apple doesn't have resolves to nothing rather than the wrong one")
+    func resolvedLocaleRefusesAnUnsupportedLanguage() async {
+        await #expect(throws: PipelineError.self) {
+            try await AppleSpeechBackend.resolvedLocale(for: .swedish)
+        }
     }
 
     @Test("Every language gets a model that can actually transcribe it")

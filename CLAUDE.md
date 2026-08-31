@@ -98,15 +98,40 @@ Diarization failure is survivable and marks the meeting `degraded`; ASR failure
 fails the run. Nothing partial is ever persisted, so there is no resume state.
 
 **Backends.** The model is derived, not chosen: `ASRBackendKind(transcribing:)`
-maps English to `AppleSpeechBackend` and Swedish to `WhisperKitBackend`
-(KB-Whisper Large). There is no model setting and no automatic case in either
-enum — the user declares the language in `ImportSheet` (defaulting to English)
-and everything follows. `SNOOPY_BACKEND` overrides the mapping for benchmarking,
-which is the only way to reach a model/language mismatch; `TranscriptionPipeline`
-guards that case up front, before diarization spends a minute on the file.
-Transcripts written before the automatic option went away say `"auto"` on disk
-and decode as Swedish, which is what they ran as; `MeetingStore` silently drops
-what it cannot decode, so that fallback is load-bearing.
+maps each of the ten `MeetingLanguage` cases to one of three backends — Apple
+for the six locales it covers, KB-Whisper Large for Swedish, stock Whisper
+large-v3 for Danish, Dutch and Polish. There is no model setting and no
+automatic case in either enum: the user declares the language in `ImportSheet`
+(defaulting to English) and everything follows. `SNOOPY_BACKEND` overrides the
+mapping for benchmarking, which is the only way to reach a model/language
+mismatch; `TranscriptionPipeline` guards that up front, before diarization
+spends a minute on the file. Transcripts written before the automatic option
+went away say `"auto"` on disk and decode as Swedish, which is what they ran
+as; `MeetingStore` silently drops what it cannot decode, so that fallback is
+load-bearing.
+
+`AppleSpeechBackend` is the one backend not bound to a single model: Apple
+installs assets **per locale**, so `prepare`/`isPrepared` take a
+`MeetingLanguage` and `resolvedLocale(for:)` picks a variant — the user's own
+region when it exists (`de-AT` for an Austrian), else the language's home
+region. That is why the whole `TranscriptionBackend` protocol is
+language-parameterised.
+
+**Models are downloaded on purpose.** `ManagedModel` is the catalogue of what
+Snoopy fetches itself (diarization, KB-Whisper Large, Whisper large-v3),
+wrapping three different mechanisms: FluidAudio's loader, `KBWhisperModelStore`
+(a hand-rolled fetch of a hardcoded file list, because KBLab's repo is not in
+WhisperKit's layout) and `WhisperKitModelStore` (WhisperKit's own downloader,
+for `argmaxinc/whisperkit-coreml`, whose folders carry files that list lacks).
+Both stores write under one directory so Settings ▸ Models measures and deletes
+in one place. `ModelDownloadQueue` runs them one at a time and lives in
+`AppEnvironment` because `WelcomeWindow`, `ModelDownloadsWindow` and Settings
+all drive the same queue; its fetching is injected (`Fetcher`) so the state
+machine is testable without downloading gigabytes. `ImportSheet` disables
+Transcribe when the language's model is missing and `TranscriptionPipeline`
+guards it again — Apple's languages and `SNOOPY_BACKEND` are exempt, the former
+because macOS installs those itself.
+
 `BackendRegistry` is an actor that keeps loaded models resident;
 Settings ▸ Models calls `unloadAll()` before deleting model files from disk.
 Long recordings are cut into at most 4 coarse slices at real silences and
@@ -132,8 +157,10 @@ Both honour the same contract — microphone on channel 0, system audio on chann
 via `TwoChannelWriter`. Keeping the sides apart is free while recording and
 impossible to recover afterwards.
 
-**UI.** `MacApp` registers the scenes (main, recorder, settings, about,
-attributions, help). `Sidebar` is the `NavigationSplitView` driving
+**UI.** `MacApp` registers the scenes (main, recorder, models, welcome,
+settings, about, attributions, help). `WelcomeWindow` opens once from
+`MainWindow`'s `RootView` — a view, not a scene modifier, because the check
+reads `AppSettings.hasCompletedOnboarding` and a `Scene` has no environment. `Sidebar` is the `NavigationSplitView` driving
 `SidebarSelection`, handles drag-and-drop and file import, and auto-selects the
 meeting the pipeline just finished. Panes live in `macOS/Panes/`, with
 `WaveformScrubber` and `PlayerController` behind playback.

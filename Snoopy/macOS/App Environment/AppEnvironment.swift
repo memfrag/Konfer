@@ -38,6 +38,10 @@ public final class AppEnvironment {
     /// Runs recordings through diarization and speech recognition.
     internal let pipeline: TranscriptionPipeline
 
+    /// Downloads the models. Shared, because the downloads window, Settings and
+    /// the first-run screen all drive the same queue.
+    internal let downloads: ModelDownloadQueue
+
     // MARK: - Init
 
     /// Creates an environment with the provided dependencies.
@@ -49,12 +53,14 @@ public final class AppEnvironment {
         engineeringMode: EngineeringMode,
         meetingStore: MeetingStore,
         speakerStore: SpeakerStore,
-        pipeline: TranscriptionPipeline
+        pipeline: TranscriptionPipeline,
+        downloads: ModelDownloadQueue
     ) {
         self.appSettings = appSettings
         self.engineeringMode = engineeringMode
         self.meetingStore = meetingStore
         self.speakerStore = speakerStore
         self.pipeline = pipeline
+        self.downloads = downloads
     }
 }

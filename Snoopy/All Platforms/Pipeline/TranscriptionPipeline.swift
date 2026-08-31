@@ -170,11 +170,23 @@ final class TranscriptionPipeline {
         defer { prepared?.cleanUp() }
 
         do {
-            // 0. The chosen model has to be able to speak the chosen language.
-            //    Checked before anything else: diarization takes a minute on a
-            //    long recording, and failing after it would waste all of it.
+            // 0. Two things have to hold before any work starts, because
+            //    diarization takes a minute on a long recording and failing
+            //    after it would waste all of it.
+
+            //    The chosen model has to be able to speak the chosen language.
             guard job.backend.supports(job.language) else {
                 throw PipelineError.languageUnsupported(job.language)
+            }
+
+            //    And its model has to be on disk already. The UI stops this
+            //    first — see `ImportSheet` — so reaching here means another
+            //    caller slipped past. `SNOOPY_BACKEND` is exempt: benchmarking
+            //    keeps the old lazy download.
+            if Self.backendOverride == nil,
+               let required = ManagedModel(transcribing: job.language),
+               !required.isInstalled {
+                throw PipelineError.modelNotDownloaded(required)
             }
 
             // 1. Normalize the input. Video files get their audio extracted to a
@@ -215,9 +227,9 @@ final class TranscriptionPipeline {
             // 3. Speech recognition. This one is load-bearing: speaker segments
             //    with no words have no use, so a failure fails the run.
             let backend = await registry.backend(for: job.backend)
-            if await !backend.isPrepared { stage = .preparingModels(0) }
+            if await !backend.isPrepared(for: job.language) { stage = .preparingModels(0) }
             do {
-                try await backend.prepare { [weak self] fraction in
+                try await backend.prepare(for: job.language) { [weak self] fraction in
                     Task { @MainActor in self?.stage = .preparingModels(fraction) }
                 }
             } catch is CancellationError {

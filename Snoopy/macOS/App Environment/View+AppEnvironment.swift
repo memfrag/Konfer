@@ -22,6 +22,7 @@ extension View {
             .environment(appEnvironment.meetingStore)
             .environment(appEnvironment.speakerStore)
             .environment(appEnvironment.pipeline)
+            .environment(appEnvironment.downloads)
     }
 
     #if DEBUG
@@ -33,6 +34,7 @@ extension View {
             .environment(appEnvironment.meetingStore)
             .environment(appEnvironment.speakerStore)
             .environment(appEnvironment.pipeline)
+            .environment(appEnvironment.downloads)
     }
     #endif
 }

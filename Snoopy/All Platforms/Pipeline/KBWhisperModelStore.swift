@@ -104,9 +104,19 @@ nonisolated enum KBWhisperModelStore {
         ModelStorage.size(of: directory)
     }
 
+    /// Deletes everything under ``directory`` — every KB-Whisper variant *and*
+    /// the WhisperKit-managed models that share the folder. Settings ▸ Models
+    /// uses this for "free up all of it".
     static func removeAll() throws {
         guard FileManager.default.fileExists(atPath: directory.path) else { return }
         try FileManager.default.removeItem(at: directory)
+    }
+
+    /// Deletes a single variant, leaving anything else in the folder alone.
+    static func remove(_ variant: Variant) throws {
+        let root = directory(for: variant)
+        guard FileManager.default.fileExists(atPath: root.path) else { return }
+        try FileManager.default.removeItem(at: root)
     }
 
     // MARK: - Variant

@@ -127,24 +127,74 @@ nonisolated struct EnrollmentSuggestion: Codable, Hashable, Sendable {
 
 /// The language the user declared for a recording.
 ///
-/// This decides which model runs. English goes to Apple's `SpeechTranscriber`,
-/// which has no Swedish; everything else goes to KB-Whisper. It also pins
-/// Whisper's own language, without which it detects one per chunk and flips
-/// mid-recording on Swedish speech containing English terms.
+/// This decides which model runs — see ``ASRBackendKind/init(transcribing:)``.
+/// It also pins Whisper's own language, without which it detects one per chunk
+/// and flips mid-recording on Swedish speech containing English terms.
 ///
-/// It is the only such choice: the model follows from it, English to Apple's
-/// transcriber and Swedish to KB-Whisper Large, so there is nothing else for
-/// the user to get wrong. A wrong language, though, doesn't degrade an hour of
-/// transcript so much as replace it with something else.
+/// It is the only such choice the user makes: the model follows from it, so
+/// there is nothing else to get wrong. A wrong language, though, doesn't
+/// degrade an hour of transcript so much as replace it with something else.
 ///
+/// Declaration order is picker order: the two Snoopy was built for, then the
+/// three it grew for, then the ones Apple happened to already cover.
 public nonisolated enum MeetingLanguage: String, Codable, CaseIterable, Sendable {
-    case swedish
     case english
+    case swedish
+    case danish
+    case dutch
+    case polish
+    case german
+    case spanish
+    case french
+    case italian
+    case portuguese
 
     public var displayName: String {
         switch self {
-        case .swedish: "Swedish"
         case .english: "English"
+        case .swedish: "Swedish"
+        case .danish: "Danish"
+        case .dutch: "Dutch"
+        case .polish: "Polish"
+        case .german: "German"
+        case .spanish: "Spanish"
+        case .french: "French"
+        case .italian: "Italian"
+        case .portuguese: "Portuguese"
+        }
+    }
+
+    /// The BCP-47 language code, for matching against Apple's supported locales
+    /// and for pinning Whisper.
+    public var code: String {
+        switch self {
+        case .english: "en"
+        case .swedish: "sv"
+        case .danish: "da"
+        case .dutch: "nl"
+        case .polish: "pl"
+        case .german: "de"
+        case .spanish: "es"
+        case .french: "fr"
+        case .italian: "it"
+        case .portuguese: "pt"
+        }
+    }
+
+    /// The region to fall back to when the user's own doesn't have a variant of
+    /// this language, e.g. a Swedish user transcribing German gets `de-DE`.
+    public var homeRegion: String {
+        switch self {
+        case .english: "US"
+        case .swedish: "SE"
+        case .danish: "DK"
+        case .dutch: "NL"
+        case .polish: "PL"
+        case .german: "DE"
+        case .spanish: "ES"
+        case .french: "FR"
+        case .italian: "IT"
+        case .portuguese: "PT"
         }
     }
 

@@ -13,7 +13,7 @@ struct MainWindow: Scene {
     var body: some Scene {
 
         WindowGroup {
-            Sidebar()
+            RootView()
                 .frame(minWidth: 720, minHeight: 460)
                 .appEnvironment(.default)
                 .terminatesAppWhenClosed()
@@ -25,7 +25,28 @@ struct MainWindow: Scene {
             RecordCommand()
             ExportCommands()
             HelpCommands()
+            ModelCommands()
 
         }
+    }
+}
+
+// MARK: - Root
+
+/// The sidebar, plus the one thing that has to happen on a first launch.
+///
+/// A view rather than a modifier on the scene, because the welcome check reads
+/// `AppSettings` — and a `Scene` has no environment to read it from.
+private struct RootView: View {
+
+    @Environment(AppSettings.self) private var appSettings
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Sidebar()
+            .task {
+                guard !appSettings.hasCompletedOnboarding else { return }
+                openWindow(id: WelcomeWindow.windowID)
+            }
     }
 }

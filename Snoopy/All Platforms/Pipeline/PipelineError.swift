@@ -14,6 +14,7 @@ nonisolated enum PipelineError: LocalizedError {
     case transcriptionFailed(underlying: Error)
     case appleSpeechUnavailable
     case languageUnsupported(MeetingLanguage)
+    case modelNotDownloaded(ManagedModel)
     case cancelled
 
     var errorDescription: String? {
@@ -32,6 +33,8 @@ nonisolated enum PipelineError: LocalizedError {
             "Apple's speech recognition isn't available on this Mac."
         case .languageUnsupported(let language):
             "Apple's speech recognition doesn't support \(language.displayName)."
+        case .modelNotDownloaded(let model):
+            "\(model.displayName) hasn't been downloaded yet."
         case .cancelled:
             "Transcription was cancelled."
         }
@@ -50,8 +53,11 @@ nonisolated enum PipelineError: LocalizedError {
         case .appleSpeechUnavailable:
             "Choose KB-Whisper in Settings ▸ Transcription instead."
         case .languageUnsupported:
-            "Apple covers 30 locales, and Swedish isn't one of them. "
-            + "Choose KB-Whisper in Settings ▸ Transcription for this recording."
+            "Snoopy has no model for that language."
+        case .modelNotDownloaded(let model):
+            "This recording's language needs \(model.displayName) "
+            + "(\(ModelStorage.formattedSize(model.estimatedBytes))). "
+            + "Download it from Settings ▸ Models."
         default:
             nil
         }

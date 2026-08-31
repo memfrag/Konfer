@@ -33,7 +33,8 @@ extension AppEnvironment {
                 diarizer: DiarizationService(),
                 meetingStore: meetingStore,
                 speakerStore: speakerStore
-            )
+            ),
+            downloads: ModelDownloadQueue()
         )
     }
     #endif

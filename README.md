@@ -1,8 +1,9 @@
 # Snoopy
 
-On-device transcription of multi-speaker meetings, in Swedish or English.
+On-device transcription of multi-speaker meetings, in ten languages.
 Drop in a recording and get a transcript where every line carries a timestamp
-and a speaker. Nothing leaves the machine except the one-time model download.
+and a speaker. Nothing leaves the machine except the models themselves, which
+are downloaded once, on purpose, before anything runs.
 
 ## How it works
 
@@ -11,10 +12,11 @@ Three stages:
 1. **Diarization** — [FluidAudio](https://github.com/FluidInference/FluidAudio)'s
    `OfflineDiarizerManager` (pyannote segmentation, WeSpeaker embeddings, VBx
    clustering) works out who spoke when.
-2. **Speech recognition** — Apple's `SpeechTranscriber` for English,
-   [KB-Whisper](https://huggingface.co/KBLab/kb-whisper-large) via
-   [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift) for Swedish.
-   Both produce per-word timings.
+2. **Speech recognition** — Apple's `SpeechTranscriber` where it has the
+   language, [KB-Whisper](https://huggingface.co/KBLab/kb-whisper-large) for
+   Swedish and stock Whisper large-v3 for the rest, both via
+   [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift). All produce
+   per-word timings.
 3. **The merge** — `SpeakerAligner` attributes each word to the speaker segment
    it overlaps most, then groups words into turns. Nothing off the shelf joins
    these two halves; this is the part Snoopy adds.
@@ -43,11 +45,21 @@ degenerate into a repetition loop. Parakeet was removed once Apple's transcriber
 covered English better than it did.
 
 There is no model picker. Each row above has one sensible reading, so the
-language you declare for a recording decides: **English goes to Apple**, nine
-times faster and with nothing to download, and **Swedish goes to KB-Whisper
-Large**, because Apple has no Swedish at all. Settings ▸ Transcription shows the
-routing and what each costs. `SNOOPY_BACKEND` forces one model regardless, for
-comparing them on the same recording.
+language you declare for a recording decides:
+
+| Language | Model | Why |
+|---|---|---|
+| English, German, Spanish, French, Italian, Portuguese | Apple | Nine times faster, and nothing for Snoopy to download |
+| Swedish | KB-Whisper Large | Apple has no Swedish; this was trained for it |
+| Danish, Dutch, Polish | Whisper large-v3 | Neither of the others can do them |
+
+Apple's `SpeechTranscriber` covers 30 locales — run
+`swift scripts/supported-locales.swift` to see them, and which are installed on
+a given Mac. Danish, Dutch and Polish are not among them, and neither is
+Swedish, which is why stock Whisper is here alongside KB-Whisper's Swedish
+specialist. Settings ▸ Transcription shows the routing and what each costs.
+`SNOOPY_BACKEND` forces one model regardless, for comparing them on the same
+recording.
 
 ## What a real meeting costs
 
@@ -65,17 +77,29 @@ duration. Peak memory about 1.4 GB.
 
 ## Models
 
-Downloaded once, on the first transcription:
+Snoopy asks for its models rather than fetching them behind your back. A
+recording whose language needs a model that isn't downloaded **won't start** —
+the import sheet says which model and how big it is, and offers to fetch it.
+Three gigabytes arriving in the middle of a transcription you already committed
+to is worse than being asked.
 
-- **KB-Whisper** → `~/Library/Application Support/Snoopy/Models/` (2.9 GB for
-  large, 485 MB for small). The very first load also compiles the CoreML models
-  for the Neural Engine, which takes a few minutes; every load after that is
-  about a second.
+- **KB-Whisper** and **Whisper large-v3** →
+  `~/Library/Application Support/Snoopy/Models/` (2.9 GB and about 3 GB). The
+  very first load of each also compiles the CoreML models for the Neural
+  Engine, which takes a few minutes; every load after that is about a second.
+  Downloaded is not the same as ready.
 - **Diarization** → `~/Library/Application Support/FluidAudio/Models/` (22 MB).
-- **Apple's English models** are managed by macOS and need no download of ours.
+  Every transcription uses it, whatever the language. Small enough that it is
+  the one download still fetched on demand, and a failure is survivable anyway.
+- **Apple's models** are managed by macOS. There is nothing of ours to
+  download, measure or delete — the first recording in a new language installs
+  that locale itself, which is the one moment those languages need a network.
 
-Settings ▸ Models shows the sizes and deletes them; the next run downloads them
-again. Every run after the first is fully offline.
+The first launch asks which languages you record in and queues exactly what
+they need — for a user who only needs Apple's languages, that is nothing at
+all. Window ▸ Models, or Settings ▸ Models, reopens it: it shows what each
+model costs, downloads them one at a time, and deletes them. Everything after
+that is offline.
 
 ### Why transcription isn't chunked
 

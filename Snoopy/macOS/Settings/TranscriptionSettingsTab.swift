@@ -20,11 +20,12 @@ struct TranscriptionSettingsTab: View {
 
         Form {
             Section {
-                ForEach(MeetingLanguage.allCases, id: \.self) { language in
-                    LabeledContent(language.displayName) {
+                ForEach(Self.routing, id: \.model) { row in
+                    LabeledContent(row.model.displayName) {
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text(ASRBackendKind(transcribing: language).displayName)
-                            Text("about \(minutes(for: language)) per hour of audio")
+                            Text(row.languages.map(\.displayName).joined(separator: ", "))
+                                .multilineTextAlignment(.trailing)
+                            Text("about \(minutes(for: row.model)) per hour of audio")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -36,9 +37,10 @@ struct TranscriptionSettingsTab: View {
                 Text(
                     "The language you pick for a recording decides which model "
                     + "transcribes it. Apple's recognition covers 30 locales, "
-                    + "and Swedish isn't one of them. KB-Whisper is the National "
-                    + "Library of Sweden's Whisper model, trained on more than "
-                    + "50,000 hours of Swedish."
+                    + "and Swedish, Danish, Dutch and Polish aren't among them. "
+                    + "KB-Whisper is the National Library of Sweden's Whisper "
+                    + "model, trained on more than 50,000 hours of Swedish; the "
+                    + "other three go to OpenAI's multilingual Whisper."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -69,9 +71,25 @@ struct TranscriptionSettingsTab: View {
         }
     }
 
-    private func minutes(for language: MeetingLanguage) -> String {
-        let value = ASRBackendKind(transcribing: language)
-            .estimatedMinutesPerHourOfAudio
+    /// Which languages each model is responsible for, in picker order.
+    ///
+    /// Grouped by model rather than listed per language: ten rows saying the
+    /// same three things is a wall, and the grouping *is* the information —
+    /// what a model costs is a fact about the model, not about each language.
+    private static var routing: [(model: ASRBackendKind, languages: [MeetingLanguage])] {
+        var order: [ASRBackendKind] = []
+        var grouped: [ASRBackendKind: [MeetingLanguage]] = [:]
+
+        for language in MeetingLanguage.allCases {
+            let model = ASRBackendKind(transcribing: language)
+            if grouped[model] == nil { order.append(model) }
+            grouped[model, default: []].append(language)
+        }
+        return order.map { ($0, grouped[$0] ?? []) }
+    }
+
+    private func minutes(for model: ASRBackendKind) -> String {
+        let value = model.estimatedMinutesPerHourOfAudio
         return value < 2 ? "a minute" : "\(Int(value)) minutes"
     }
 }

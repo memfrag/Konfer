@@ -47,11 +47,9 @@ nonisolated struct TranscriptionRequest: Sendable {
 
 /// Speech recognition, behind a protocol.
 ///
-/// Parakeet v3 handles both Swedish and English, but its published Swedish word
-/// error rate is roughly three times its English one, and real meeting audio is
-/// worse than the benchmark. This protocol is the swap point: a Swedish
-/// specialist (KB-Whisper via WhisperKit, say) can replace the backend without
-/// touching diarization, alignment, or anything above them.
+/// The swap point: a language specialist (KB-Whisper for Swedish) sits beside a
+/// generalist (Apple, stock Whisper) without diarization, alignment or anything
+/// above them knowing which is running.
 ///
 /// Implementations are used from a background context, so they must not be
 /// `@MainActor`. Note that this app builds with default-`MainActor` isolation,
@@ -60,11 +58,19 @@ nonisolated struct TranscriptionRequest: Sendable {
 nonisolated protocol TranscriptionBackend: Sendable {
 
     /// Downloads and loads models if needed. Safe to call repeatedly.
-    func prepare(progress: @escaping @Sendable (Double) -> Void) async throws
+    ///
+    /// Takes the language because readiness is not always a single fact about
+    /// the backend: Apple installs its models **per locale**, so a backend
+    /// ready for English may still have to fetch German. Backends bound to one
+    /// model ignore it.
+    func prepare(
+        for language: MeetingLanguage,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws
 
-    /// Whether models are already resident, so callers can skip a preparation
-    /// stage in the UI.
-    var isPrepared: Bool { get async }
+    /// Whether models for this language are already resident, so callers can
+    /// skip a preparation stage in the UI.
+    func isPrepared(for language: MeetingLanguage) async -> Bool
 
     /// Releases loaded models, e.g. before deleting them from disk.
     func unload() async

@@ -6,16 +6,18 @@ import AVFoundation
 import Foundation
 import WhisperKit
 
-/// Speech recognition via KB-Whisper, the National Library of Sweden's Whisper
-/// fine-tune, running on CoreML through WhisperKit.
+/// Speech recognition through WhisperKit, running Whisper on CoreML.
 ///
-/// Chosen for Swedish: on real meeting audio it recovers whole phrases Parakeet
-/// turns to noise — "Resans roll i att öka omsättningen" where Parakeet gives
-/// "Reslånser om i ökonsättning". It also returns word timings, so speaker
-/// alignment and word-level playback highlighting work exactly as before.
+/// Serves two different models. **KB-Whisper**, the National Library of
+/// Sweden's fine-tune, does Swedish: on real meeting audio it recovers whole
+/// phrases Parakeet turns to noise — "Resans roll i att öka omsättningen"
+/// where Parakeet gives "Reslånser om i ökonsättning". **Stock Whisper
+/// large-v3** does Danish, Dutch and Polish, which nothing else here can.
+/// Both return word timings, so speaker alignment and word-level playback
+/// highlighting work the same either way.
 ///
-/// The first load of a variant compiles the CoreML models, which takes minutes
-/// for `large`; every load after that is about a second.
+/// The first load of a model compiles the CoreML bundles, which takes minutes
+/// at this size; every load after that is about a second.
 ///
 /// Counts decoded tokens, as a fine-grained progress signal.
 ///
@@ -47,24 +49,57 @@ private nonisolated final class TokenCounter: @unchecked Sendable {
 
 actor WhisperKitBackend: TranscriptionBackend {
 
-    private let variant: KBWhisperModelStore.Variant
+    /// Where a model comes from.
+    ///
+    /// The two are fetched differently — see ``WhisperKitModelStore`` for why —
+    /// but once on disk they are both just a folder to point WhisperKit at.
+    enum ModelSource: Sendable, Hashable {
+        case kbWhisper(KBWhisperModelStore.Variant)
+        case whisperKit(WhisperKitModelStore.Variant)
+
+        var folder: URL {
+            switch self {
+            case .kbWhisper(let variant): KBWhisperModelStore.directory(for: variant)
+            case .whisperKit(let variant): WhisperKitModelStore.directory(for: variant)
+            }
+        }
+
+        var isDownloaded: Bool {
+            switch self {
+            case .kbWhisper(let variant): KBWhisperModelStore.isDownloaded(variant)
+            case .whisperKit(let variant): WhisperKitModelStore.isDownloaded(variant)
+            }
+        }
+
+        func download(progress: @escaping @Sendable (Double) -> Void) async throws {
+            switch self {
+            case .kbWhisper(let variant):
+                try await KBWhisperModelStore.download(variant, progress: progress)
+            case .whisperKit(let variant):
+                try await WhisperKitModelStore.download(variant, progress: progress)
+            }
+        }
+    }
+
+    private let source: ModelSource
     private var whisperKit: WhisperKit?
 
-    init(variant: KBWhisperModelStore.Variant) {
-        self.variant = variant
+    init(source: ModelSource) {
+        self.source = source
     }
 
     /// Whisper's language code for a meeting's declared language.
+    ///
+    /// Whisper's codes are the same BCP-47 codes ``MeetingLanguage/code`` gives
+    /// for every language Snoopy offers, so there is no second table to keep in
+    /// step.
     ///
     /// Never nil: letting Whisper detect the language means detecting it per
     /// chunk, which is actively harmful on this material. A pinned language
     /// still handles English stretches inside a Swedish file perfectly well,
     /// which is why the user is asked to declare one rather than guess.
     private nonisolated static func whisperLanguage(for language: MeetingLanguage) -> String {
-        switch language {
-        case .swedish: "sv"
-        case .english: "en"
-        }
+        language.code
     }
 
     /// How WhisperKit splits the file before transcribing.
@@ -142,13 +177,18 @@ actor WhisperKitBackend: TranscriptionBackend {
         ProcessInfo.processInfo.environment["SNOOPY_WHISPER_VERBOSE"] == "1"
     }
 
-    var isPrepared: Bool { whisperKit != nil }
+    /// One model, one language pinned at decode time, so the language makes no
+    /// difference to what has to be loaded.
+    func isPrepared(for language: MeetingLanguage) -> Bool { whisperKit != nil }
 
-    func prepare(progress: @escaping @Sendable (Double) -> Void) async throws {
+    func prepare(
+        for language: MeetingLanguage,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws {
         guard whisperKit == nil else { return }
 
         do {
-            try await KBWhisperModelStore.download(variant, progress: progress)
+            try await source.download(progress: progress)
         } catch let error as PipelineError {
             throw error
         } catch {
@@ -158,7 +198,7 @@ actor WhisperKitBackend: TranscriptionBackend {
         // `tokenizerFolder` falls back to `downloadBase`, so give WhisperKit a
         // concrete place to cache the tokenizer rather than leaving it nil.
         let config = WhisperKitConfig(
-            modelFolder: KBWhisperModelStore.directory(for: variant).path,
+            modelFolder: source.folder.path,
             tokenizerFolder: KBWhisperModelStore.directory,
             voiceActivityDetector: Self.voiceActivityDetector,
             verbose: Self.verboseLogging,

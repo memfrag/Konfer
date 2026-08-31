@@ -30,6 +30,17 @@ nonisolated enum ModelStorage {
         FileManager.default.fileExists(atPath: directory.path)
     }
 
+    /// Whether anything has actually been downloaded.
+    ///
+    /// The directory alone proves nothing — FluidAudio creates it before
+    /// fetching — but reading one entry is cheap, unlike measuring the tree.
+    static var isPopulated: Bool {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            atPath: directory.path
+        ) else { return false }
+        return !contents.isEmpty
+    }
+
     /// Total bytes on disk, or zero when nothing has been downloaded.
     static func sizeOnDisk() -> Int64 {
         size(of: directory)

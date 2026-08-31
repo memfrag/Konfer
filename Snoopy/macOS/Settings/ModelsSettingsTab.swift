@@ -12,6 +12,7 @@ import SwiftUI
 struct ModelsSettingsTab: View {
 
     @Environment(TranscriptionPipeline.self) private var pipeline
+    @Environment(\.openWindow) private var openWindow
 
     @State private var fluidAudioSize: Int64 = 0
     @State private var whisperSize: Int64 = 0
@@ -52,6 +53,10 @@ struct ModelsSettingsTab: View {
 
             Section {
                 HStack {
+                    Button("Manage Models…") {
+                        openWindow(id: ModelDownloadsWindow.windowID)
+                    }
+
                     Button("Reveal in Finder") {
                         NSWorkspace.shared.selectFile(
                             nil,
