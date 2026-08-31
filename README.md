@@ -1,4 +1,4 @@
-# Snoopy
+# Konfer
 
 On-device transcription of multi-speaker meetings, in ten languages.
 Drop in a recording and get a transcript where every line carries a timestamp
@@ -19,7 +19,7 @@ Three stages:
    per-word timings.
 3. **The merge** — `SpeakerAligner` attributes each word to the speaker segment
    it overlaps most, then groups words into turns. Nothing off the shelf joins
-   these two halves; this is the part Snoopy adds.
+   these two halves; this is the part Konfer adds.
 
 Diarization and recognition run in sequence, not in parallel: both saturate the
 Neural Engine, so concurrency buys nothing and makes progress meaningless.
@@ -49,7 +49,7 @@ language you declare for a recording decides:
 
 | Language | Model | Why |
 |---|---|---|
-| English, German, Spanish, French, Italian, Portuguese | Apple | Nine times faster, and nothing for Snoopy to download |
+| English, German, Spanish, French, Italian, Portuguese | Apple | Nine times faster, and nothing for Konfer to download |
 | Swedish | KB-Whisper Large | Apple has no Swedish; this was trained for it |
 | Danish, Dutch, Polish | Whisper large-v3 | Neither of the others can do them |
 
@@ -58,7 +58,7 @@ Apple's `SpeechTranscriber` covers 30 locales — run
 a given Mac. Danish, Dutch and Polish are not among them, and neither is
 Swedish, which is why stock Whisper is here alongside KB-Whisper's Swedish
 specialist. Settings ▸ Transcription shows the routing and what each costs.
-`SNOOPY_BACKEND` forces one model regardless, for comparing them on the same
+`KONFER_BACKEND` forces one model regardless, for comparing them on the same
 recording.
 
 ## What a real meeting costs
@@ -77,14 +77,14 @@ duration. Peak memory about 1.4 GB.
 
 ## Models
 
-Snoopy asks for its models rather than fetching them behind your back. A
+Konfer asks for its models rather than fetching them behind your back. A
 recording whose language needs a model that isn't downloaded **won't start** —
 the import sheet says which model and how big it is, and offers to fetch it.
 Three gigabytes arriving in the middle of a transcription you already committed
 to is worse than being asked.
 
 - **KB-Whisper** and **Whisper large-v3** →
-  `~/Library/Application Support/Snoopy/Models/` (2.9 GB and about 3 GB). The
+  `~/Library/Application Support/Konfer/Models/` (2.9 GB and about 3 GB). The
   very first load of each also compiles the CoreML models for the Neural
   Engine, which takes a few minutes; every load after that is about a second.
   Downloaded is not the same as ready.
@@ -104,7 +104,7 @@ that is offline.
 ### Why transcription isn't chunked
 
 WhisperKit defaults to splitting a file on silence (`chunkingStrategy: .vad`)
-and decoding the chunks across 16 concurrent workers. Snoopy turns that off,
+and decoding the chunks across 16 concurrent workers. Konfer turns that off,
 and it costs more than twice the wall clock to do so.
 
 It isn't simply that the detector is bad — though it is. Measuring the
@@ -121,7 +121,7 @@ doesn't help, because the chunker splits on the longest silence it can find —
 remove the silences and it cuts mid-word instead, which is exactly what makes
 Whisper hallucinate (507 words at threshold 0.005, 583 at 0.002).
 
-Snoopy already runs pyannote before it transcribes, so `DiarizationVAD` hands
+Konfer already runs pyannote before it transcribes, so `DiarizationVAD` hands
 those segments to WhisperKit as the speech mask. That beats energy thresholding
 comfortably — and still isn't enough. Five minutes of a real Swedish meeting:
 
@@ -129,7 +129,7 @@ comfortably — and still isn't enough. Five minutes of a real Swedish meeting:
 |---|---|---|---|
 | `.vad`, WhisperKit's EnergyVAD | 606 | 66% | 33 s |
 | `.vad`, `DiarizationVAD` | **483–791** | **51–86%** | 42 s |
-| `.none` (Snoopy) | **813, 813** | **86%** | 93 s |
+| `.none` (Konfer) | **813, 813** | **86%** | 93 s |
 
 The range is not a typo. **Chunked transcription is not deterministic.** The
 same file with the same settings and the same speech regions produced 791, 657
@@ -140,13 +140,13 @@ looks exactly like a pause.
 
 A transcript that differs every time you produce it isn't worth halving the
 wait for. `DiarizationVAD` stays in the tree because it makes the comparison
-honest and re-runnable (`SNOOPY_CHUNKING=vad`), but WhisperKit's chunking is off.
+honest and re-runnable (`KONFER_CHUNKING=vad`), but WhisperKit's chunking is off.
 
 ### Coarse slicing: the parallelism without the losses
 
 WhisperKit's chunker caps every chunk at its 30-second window, so it can't be
 asked for "four chunks" — five minutes is at least ten, an hour over a hundred,
-and every seam is somewhere speech can go missing. Snoopy works one level up
+and every seam is somewhere speech can go missing. Konfer works one level up
 instead: cut the recording into a **few long slices at real silences** (found in
 the diarizer's segmentation), transcribe each in one complete unchunked pass,
 and run the slices concurrently.
@@ -168,7 +168,7 @@ make CoreML give up with *"ANE op async execution has timed out"*. And a slice
 that fails comes back as a `Result` we inspect and surface as an error, which is
 precisely what WhisperKit's own chunker does not do.
 
-`SNOOPY_SLICES=1` restores a single pass.
+`KONFER_SLICES=1` restores a single pass.
 
 Cut positions are chosen in two steps: diarization gaps give the rough places,
 then the audio itself decides the exact ones, by finding the quietest 0.3s
@@ -192,7 +192,7 @@ seconds.
 Left to detect language itself, Whisper decides **per VAD chunk** — and a
 Swedish meeting sprinkled with "stakeholder" and "AI" makes chunks flip
 language, which silently merges text from unrelated parts of the recording.
-Snoopy always pins the language.
+Konfer always pins the language.
 
 Which is why there is no automatic setting and no default: the import sheet
 opens with the language unset and will not start until one is chosen. Guessing
@@ -236,13 +236,13 @@ much better failure than the wrong name.
 Requires Xcode 26 and macOS 26.
 
 ```sh
-xcodebuild -scheme "Snoopy (Debug)" build
-xcodebuild -scheme "Snoopy (Debug)" test
+xcodebuild -scheme "Konfer (Debug)" build
+xcodebuild -scheme "Konfer (Debug)" test
 ```
 
 The app is **not** sandboxed, so the library can reference recordings wherever
 they live. Transcripts persist as one JSON file per meeting in
-`~/Library/Application Support/Snoopy/Meetings/`; audio is never copied, so a
+`~/Library/Application Support/Konfer/Meetings/`; audio is never copied, so a
 meeting whose recording has moved still opens — read-only, with playback off.
 
 ### End-to-end check
@@ -251,10 +251,10 @@ meeting whose recording has moved still opens — read-only, with playback off.
 skipped unless you point it at one:
 
 ```sh
-TEST_RUNNER_SNOOPY_AUDIO=/path/to/meeting.wav \
-  xcodebuild test -scheme "Snoopy (Debug)" \
+TEST_RUNNER_KONFER_AUDIO=/path/to/meeting.wav \
+  xcodebuild test -scheme "Konfer (Debug)" \
   -destination 'platform=macOS,arch=arm64' \
-  -only-testing:SnoopyTests/PipelineIntegrationTests
+  -only-testing:KonferTests/PipelineIntegrationTests
 ```
 
 Keep test parallelization off: two runner processes sharing one model cache
@@ -263,11 +263,11 @@ corrupt each other's download.
 ## Out of scope
 
 No live recording or streaming transcription, and no summarisation or other
-LLM post-processing. Snoopy transcribes files and stops.
+LLM post-processing. Konfer transcribes files and stops.
 
 ## License
 
-Snoopy is released under the [BSD Zero Clause License](LICENSE) — do what you
+Konfer is released under the [BSD Zero Clause License](LICENSE) — do what you
 like with it, no attribution required.
 
 Its dependencies and the speech models it downloads are other people's work,

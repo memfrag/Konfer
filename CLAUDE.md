@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Snoopy is a non-sandboxed macOS 26 SwiftUI app (Xcode 26, Swift 6.2) that records
+Konfer is a non-sandboxed macOS 26 SwiftUI app (Xcode 26, Swift 6.2) that records
 and transcribes multi-speaker meetings entirely on device, in Swedish or English.
 Everything runs locally except the one-time model download.
 
@@ -17,18 +17,18 @@ matches the tree and it is not a guide to the current app.
 ## Build and test
 
 ```sh
-xcodebuild -scheme "Snoopy (Debug)" build
-xcodebuild -scheme "Snoopy (Debug)" test
+xcodebuild -scheme "Konfer (Debug)" build
+xcodebuild -scheme "Konfer (Debug)" test
 ```
 
-Only `Snoopy (Debug)` and `Snoopy (Release)` are shared schemes; there is no plain
-`Snoopy` scheme. Tests use swift-testing (`@Test`/`#expect`), not XCTest.
+Only `Konfer (Debug)` and `Konfer (Release)` are shared schemes; there is no plain
+`Konfer` scheme. Tests use swift-testing (`@Test`/`#expect`), not XCTest.
 
 A single suite or test:
 
 ```sh
-xcodebuild test -scheme "Snoopy (Debug)" -destination 'platform=macOS,arch=arm64' \
-  -only-testing:SnoopyTests/SpeakerAlignerTests
+xcodebuild test -scheme "Konfer (Debug)" -destination 'platform=macOS,arch=arm64' \
+  -only-testing:KonferTests/SpeakerAlignerTests
 ```
 
 Most tests are fixture-based — no models, no audio, no network. Three suites are
@@ -36,25 +36,25 @@ skipped unless you point them at a real recording, and they need the
 `TEST_RUNNER_` prefix so `xcodebuild` forwards the variable to the test runner:
 
 ```sh
-TEST_RUNNER_SNOOPY_AUDIO=/path/to/meeting.wav \
-  xcodebuild test -scheme "Snoopy (Debug)" -destination 'platform=macOS,arch=arm64' \
-  -only-testing:SnoopyTests/PipelineIntegrationTests
+TEST_RUNNER_KONFER_AUDIO=/path/to/meeting.wav \
+  xcodebuild test -scheme "Konfer (Debug)" -destination 'platform=macOS,arch=arm64' \
+  -only-testing:KonferTests/PipelineIntegrationTests
 ```
 
-`PipelineIntegrationTests` also reads `SNOOPY_BACKEND`, `SNOOPY_LANGUAGE`,
-`SNOOPY_FAST` and `SNOOPY_LIBRARY=real`; `RecordingSourceTests` needs
-`SNOOPY_RECORD_APP`. Keep test parallelization off — two runner processes sharing
+`PipelineIntegrationTests` also reads `KONFER_BACKEND`, `KONFER_LANGUAGE`,
+`KONFER_FAST` and `KONFER_LIBRARY=real`; `RecordingSourceTests` needs
+`KONFER_RECORD_APP`. Keep test parallelization off — two runner processes sharing
 one model cache corrupt each other's download.
 
-Runtime overrides for experiments: `SNOOPY_BACKEND` (forces a model, including
-the otherwise unreachable `kb-whisper-small`), `SNOOPY_CHUNKING=vad`,
-`SNOOPY_SLICES=1`,
-`SNOOPY_WHISPER_VERBOSE=1`, `SNOOPY_VAD_PADDING`, `SNOOPY_RECORD_DIAGNOSTICS=1`,
+Runtime overrides for experiments: `KONFER_BACKEND` (forces a model, including
+the otherwise unreachable `kb-whisper-small`), `KONFER_CHUNKING=vad`,
+`KONFER_SLICES=1`,
+`KONFER_WHISPER_VERBOSE=1`, `KONFER_VAD_PADDING`, `KONFER_RECORD_DIAGNOSTICS=1`,
 and `APP_ENVIRONMENT=mock` to launch against `AppEnvironment.mock()`.
 
 `scripts/supported-locales.swift` (`swift scripts/supported-locales.swift`) lists
 the locales Apple's `SpeechTranscriber` supports on this machine and which have
-models installed — the check behind Snoopy's "English via Apple, everything else
+models installed — the check behind Konfer's "English via Apple, everything else
 via KB-Whisper" split. Swedish is not among the 30.
 
 There is no SwiftLint config in the repo, but the sources carry
@@ -62,7 +62,7 @@ There is no SwiftLint config in the repo, but the sources carry
 
 ## Release
 
-`scripts/build-and-notarize.sh` archives the `Snoopy (Release)` scheme, notarizes,
+`scripts/build-and-notarize.sh` archives the `Konfer (Release)` scheme, notarizes,
 builds a DMG, signs for Sparkle, publishes a GitHub release and updates
 `appcast.xml`. It expects `xcrun notarytool store-credentials 'notary'`,
 `gh auth login`, and Sparkle EdDSA keys in the keychain.
@@ -71,12 +71,12 @@ The version lives in the build settings, not in `Info.plist`: the target sets
 `GENERATE_INFOPLIST_FILE = YES`, so `CFBundleShortVersionString` and
 `CFBundleVersion` are generated from `MARKETING_VERSION` and
 `CURRENT_PROJECT_VERSION` in `project.pbxproj`. Bump those; writing version keys
-into `Snoopy/macOS/Info.plist` has no effect.
+into `Konfer/macOS/Info.plist` has no effect.
 
 ## Architecture
 
-**Layering.** `Snoopy/All Platforms/` holds the model, pipeline, recording and
-library layers; `Snoopy/macOS/` holds SwiftUI views, windows and commands.
+**Layering.** `Konfer/All Platforms/` holds the model, pipeline, recording and
+library layers; `Konfer/macOS/` holds SwiftUI views, windows and commands.
 `Packages/AppDesign` is a local SPM package for colors, typography and assets.
 Dependencies are mostly Apparata packages plus FluidAudio (diarization),
 argmax-oss-swift/WhisperKit (Swedish ASR) and Sparkle (updates).
@@ -102,7 +102,7 @@ maps each of the ten `MeetingLanguage` cases to one of three backends — Apple
 for the six locales it covers, KB-Whisper Large for Swedish, stock Whisper
 large-v3 for Danish, Dutch and Polish. There is no model setting and no
 automatic case in either enum: the user declares the language in `ImportSheet`
-(defaulting to English) and everything follows. `SNOOPY_BACKEND` overrides the
+(defaulting to English) and everything follows. `KONFER_BACKEND` overrides the
 mapping for benchmarking, which is the only way to reach a model/language
 mismatch; `TranscriptionPipeline` guards that up front, before diarization
 spends a minute on the file. Transcripts written before the automatic option
@@ -118,7 +118,7 @@ region. That is why the whole `TranscriptionBackend` protocol is
 language-parameterised.
 
 **Models are downloaded on purpose.** `ManagedModel` is the catalogue of what
-Snoopy fetches itself (diarization, KB-Whisper Large, Whisper large-v3),
+Konfer fetches itself (diarization, KB-Whisper Large, Whisper large-v3),
 wrapping three different mechanisms: FluidAudio's loader, `KBWhisperModelStore`
 (a hand-rolled fetch of a hardcoded file list, because KBLab's repo is not in
 WhisperKit's layout) and `WhisperKitModelStore` (WhisperKit's own downloader,
@@ -129,7 +129,7 @@ in one place. `ModelDownloadQueue` runs them one at a time and lives in
 all drive the same queue; its fetching is injected (`Fetcher`) so the state
 machine is testable without downloading gigabytes. `ImportSheet` disables
 Transcribe when the language's model is missing and `TranscriptionPipeline`
-guards it again — Apple's languages and `SNOOPY_BACKEND` are exempt, the former
+guards it again — Apple's languages and `KONFER_BACKEND` are exempt, the former
 because macOS installs those itself.
 
 `BackendRegistry` is an actor that keeps loaded models resident;
@@ -138,7 +138,7 @@ Long recordings are cut into at most 4 coarse slices at real silences and
 transcribed concurrently — WhisperKit's own chunking is deliberately off.
 
 **Persistence.** `MeetingStore` is one JSON file per meeting under
-`~/Library/Application Support/Snoopy/Meetings/`, write-through on every
+`~/Library/Application Support/Konfer/Meetings/`, write-through on every
 mutation. Audio is never copied: a `Meeting` holds `audioPath`, so a meeting whose
 recording moved still opens read-only. `WaveformStore` caches envelopes beside the
 transcript. `SpeakerStore` holds cross-meeting voice enrollment and only ever

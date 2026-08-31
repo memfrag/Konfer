@@ -15,11 +15,11 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 # --- Constants ---
-SCHEME="Snoopy (Release)"
-APP_NAME="Snoopy"
+SCHEME="Konfer (Release)"
+APP_NAME="Konfer"
 KEYCHAIN_PROFILE="notary"
 SPARKLE_VERSION="2.9.1"
-GITHUB_REPO="memfrag/Snoopy"
+GITHUB_REPO="memfrag/Konfer"
 
 # --- Paths ---
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

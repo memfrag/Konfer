@@ -7,7 +7,7 @@ This is a macOS SwiftUI app template with a `NavigationSplitView` sidebar, multi
 ### Structure
 
 ```
-Snoopy/
+Konfer/
 ├── macOS/
 │   ├── MacApp.swift                    ← @main entry, registers all scenes
 │   ├── MacAppDelegate.swift

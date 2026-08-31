@@ -28,7 +28,7 @@ for locale in supported.sorted(by: { $0.identifier(.bcp47) < $1.identifier(.bcp4
     print(" \(mark) \(describe(locale))")
 }
 
-// What Snoopy actually asks for: the user's own locale if it is supported.
+// What Konfer actually asks for: the user's own locale if it is supported.
 let current = Locale.current
 let match = await SpeechTranscriber.supportedLocale(equivalentTo: current)
 print("\nCurrent locale \(current.identifier(.bcp47)): "

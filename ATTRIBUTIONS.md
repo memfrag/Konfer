@@ -1,6 +1,6 @@
 # Attributions
 
-Snoopy itself is released under the BSD Zero Clause License — see [LICENSE](LICENSE).
+Konfer itself is released under the BSD Zero Clause License — see [LICENSE](LICENSE).
 0BSD asks nothing of you: no attribution, no notice, no conditions.
 
 The components below are a different matter. They are other people's work, and
@@ -14,10 +14,10 @@ included in this product.
 Two of them are worth calling out before the lists:
 
 - **The speaker diarization models are CC BY 4.0**, which *requires*
-  attribution. Anyone shipping a build of Snoopy has to carry that credit.
-- **The models are downloaded at runtime, not bundled.** A copy of Snoopy's
+  attribution. Anyone shipping a build of Konfer has to carry that credit.
+- **The models are downloaded at runtime, not bundled.** A copy of Konfer's
   source contains none of them; the first transcription in a given language
-  fetches what it needs. They are listed here because a running Snoopy uses
+  fetches what it needs. They are listed here because a running Konfer uses
   them.
 
 ---
@@ -32,15 +32,15 @@ Two of them are worth calling out before the lists:
 | [pyannote speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) | Every transcription | **CC BY 4.0** | Hervé Bredin and the pyannote authors |
 
 Apple's models are installed by macOS itself, per locale, and are governed by
-the macOS software licence rather than anything Snoopy can grant.
+the macOS software licence rather than anything Konfer can grant.
 
 KB-Whisper is a fine-tune of OpenAI's Whisper large-v3, trained on more than
 50,000 hours of Swedish.
 
-### The conversions Snoopy actually downloads
+### The conversions Konfer actually downloads
 
 None of the Whisper models are usable on the Neural Engine as published, so
-Snoopy fetches CoreML conversions of them:
+Konfer fetches CoreML conversions of them:
 
 | Repository | Contains | Licence |
 |---|---|---|
@@ -99,7 +99,7 @@ Snoopy fetches CoreML conversions of them:
 
 ## Code bundled inside those packages
 
-These are vendored rather than depended on, so they ship inside Snoopy along
+These are vendored rather than depended on, so they ship inside Konfer along
 with the package that carries them.
 
 | Component | Inside | Licence | Copyright |
@@ -109,7 +109,7 @@ with the package that carries them.
 | [text-processing-rs](https://github.com/FluidInference/text-processing-rs) | FluidAudio | Apache-2.0 | Fluid Inference |
 | [swift-transformers](https://github.com/huggingface/swift-transformers) | WhisperKit | Apache-2.0 | © 2022 Hugging Face SAS, modified by Argmax, Inc. |
 
-Snoopy's diarization is the pyannote community-1 pipeline reimplemented in
+Konfer's diarization is the pyannote community-1 pipeline reimplemented in
 Swift by FluidAudio: pyannote segmentation, speaker embeddings, and
 agglomerative clustering by way of fastcluster, with VBx behind the clustering
 refinement.
