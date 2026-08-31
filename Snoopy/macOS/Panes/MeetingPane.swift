@@ -16,6 +16,7 @@ struct MeetingPane: View {
     @State private var waveform: Waveform?
     @State private var exportFormat: TranscriptExporter.Format?
     @State private var exportDocument: TranscriptDocument?
+    @State private var find = TranscriptFindController()
 
     private var meeting: Meeting? { meetingStore.meeting(meetingID) }
 
@@ -33,6 +34,15 @@ struct MeetingPane: View {
         .task(id: meetingID) { await loadWaveform() }
         .onDisappear { player.unload() }
         .focusedSceneValue(\.exportableMeeting, exportable)
+        // Lets Edit ▸ Find drive this transcript's find bar.
+        .focusedSceneValue(\.transcriptFind, find)
+        // `initial` matters: without it the controller holds no transcript
+        // until one changes, and the first search of an untouched meeting
+        // finds nothing.
+        .onChange(of: meeting?.utterances, initial: true) { _, utterances in
+            find.update(with: utterances ?? [])
+        }
+        .onChange(of: meetingID) { _, _ in find.dismiss() }
         .fileExporter(
             isPresented: Binding(
                 get: { exportDocument != nil },
@@ -52,6 +62,13 @@ struct MeetingPane: View {
         VStack(spacing: 0) {
             header(meeting)
             Divider()
+            if find.isPresented {
+                TranscriptFindBar(
+                    controller: find,
+                    onReplace: { replaceCurrentMatch() },
+                    onReplaceAll: { replaceAllMatches() }
+                )
+            }
             transcript(meeting)
             if !meeting.audioExists {
                 Divider()
@@ -162,6 +179,10 @@ struct MeetingPane: View {
                         color: SpeakerPalette.color(for: utterance.speakerId, in: meeting),
                         isActive: isActive(utterance),
                         activeWordIndex: activeWordIndex(in: utterance),
+                        searchMatches: find.matches.filter { $0.utteranceID == utterance.id },
+                        currentSearchMatch: find.current?.utteranceID == utterance.id
+                            ? find.current
+                            : nil,
                         otherSpeakers: meeting.speakers.filter { $0.id != utterance.speakerId },
                         canMergePrevious: index > 0,
                         canMergeNext: index + 1 < meeting.utterances.count,
@@ -185,6 +206,13 @@ struct MeetingPane: View {
                 }
             }
             .listStyle(.plain)
+            .onChange(of: find.current) { _, match in
+                // Finding a match you then have to scroll to isn't finding it.
+                guard let match else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(match.utteranceID, anchor: .center)
+                }
+            }
             .onChange(of: activeUtteranceID) { _, id in
                 // Follows the playhead however it moved — playing, scrubbing
                 // the waveform, or clicking a timestamp. Scrubbing to a moment
@@ -217,6 +245,20 @@ struct MeetingPane: View {
     }
 
     /// Who speaks when, in the same colours as the chips above the transcript.
+    // MARK: - Search and replace
+
+    /// Replaces the match the find bar is sitting on.
+    private func replaceCurrentMatch() {
+        guard let match = find.current else { return }
+        meetingStore.modify(meetingID) { $0.replace(match, with: find.replacement) }
+    }
+
+    private func replaceAllMatches() {
+        let query = find.query
+        let replacement = find.replacement
+        meetingStore.modify(meetingID) { $0.replaceAll(query, with: replacement) }
+    }
+
     private func speakerSpans(in meeting: Meeting) -> [SpeakerSpan] {
         meeting.utterances.map {
             SpeakerSpan(

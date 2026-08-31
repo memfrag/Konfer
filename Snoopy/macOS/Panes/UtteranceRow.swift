@@ -13,6 +13,10 @@ struct UtteranceRow: View {
     let color: Color
     let isActive: Bool
     let activeWordIndex: Int?
+
+    /// Search matches inside this turn, and which of them the find bar is on.
+    let searchMatches: [TranscriptMatch]
+    let currentSearchMatch: TranscriptMatch?
     let otherSpeakers: [SpeakerLabel]
 
     /// False at the ends of the transcript, where there is no neighbour.
@@ -119,17 +123,46 @@ struct UtteranceRow: View {
             TranscriptText(
                 tokens: WordToken.tokens(from: words),
                 activeWordIndex: isActive ? activeWordIndex : nil,
+                searchMatches: searchMatches,
+                currentSearchMatch: currentSearchMatch,
                 onSeek: onSeekTo
             )
         } else {
             // An edited turn has no word timings left, so the whole line seeks
             // to its own start.
-            Text(utterance.text)
+            // An edited turn has no tokens to tint, so the highlight goes on
+            // the string itself.
+            Text(highlighted(utterance.text))
                 .fixedSize(horizontal: false, vertical: true)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onSeek)
                 .accessibilityAddTraits(.isButton)
         }
+    }
+
+    /// The turn's text with its search matches marked.
+    private func highlighted(_ text: String) -> AttributedString {
+        var attributed = AttributedString(text)
+        for match in searchMatches {
+            guard let range = Self.range(of: match, in: attributed) else { continue }
+            let isCurrent = match == currentSearchMatch
+            attributed[range].backgroundColor = isCurrent
+                ? .orange.opacity(0.55)
+                : .yellow.opacity(0.35)
+        }
+        return attributed
+    }
+
+    private static func range(
+        of match: TranscriptMatch,
+        in attributed: AttributedString
+    ) -> Range<AttributedString.Index>? {
+        let characters = attributed.characters
+        guard match.offset >= 0,
+              match.offset + match.length <= characters.count else { return nil }
+        let start = characters.index(characters.startIndex, offsetBy: match.offset)
+        let end = characters.index(start, offsetBy: match.length)
+        return start..<end
     }
 
     private var editor: some View {

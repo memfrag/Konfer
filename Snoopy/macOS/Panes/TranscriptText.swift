@@ -22,6 +22,12 @@ struct WordToken: Identifiable {
     /// The word indices this token covers, for matching the playback highlight.
     let range: Range<Int>
 
+    /// Where this token sits in the turn's text, in characters.
+    ///
+    /// Carried on the token so highlighting a search match is a comparison
+    /// rather than a walk of every word for every token on every render.
+    let textRange: Range<Int>
+
     /// The word being spoken at a given moment, or nil between words.
     ///
     /// `last`, not `first`: word timings abut, so at the exact instant a word
@@ -42,10 +48,17 @@ struct WordToken: Identifiable {
 
     static func tokens(from words: [WordSpan]) -> [WordToken] {
         var tokens: [WordToken] = []
+        var offset = 0
 
         for (index, span) in words.enumerated() {
             let piece = span.word
             guard !piece.isEmpty else { continue }
+
+            // The same joining rule the text itself was built with, so the
+            // offsets describe `SpeakerAligner.joined(words)` exactly.
+            let spacing = offset > 0 ? SpeakerAligner.spacing(before: piece).count : 0
+            let start = offset + spacing
+            offset = start + piece.count
 
             if !tokens.isEmpty, SpeakerAligner.spacing(before: piece).isEmpty {
                 let previous = tokens.removeLast()
@@ -54,7 +67,8 @@ struct WordToken: Identifiable {
                         id: previous.id,
                         text: previous.text + piece,
                         start: previous.start,
-                        range: previous.range.lowerBound..<(index + 1)
+                        range: previous.range.lowerBound..<(index + 1),
+                        textRange: previous.textRange.lowerBound..<offset
                     )
                 )
             } else {
@@ -63,7 +77,8 @@ struct WordToken: Identifiable {
                         id: index,
                         text: piece,
                         start: span.start,
-                        range: index..<(index + 1)
+                        range: index..<(index + 1),
+                        textRange: start..<offset
                     )
                 )
             }
@@ -84,6 +99,10 @@ struct TranscriptText: View {
 
     let tokens: [WordToken]
     let activeWordIndex: Int?
+
+    let searchMatches: [TranscriptMatch]
+    let currentSearchMatch: TranscriptMatch?
+
     let onSeek: (TimeInterval) -> Void
 
     @State private var hovered: Int?
@@ -96,7 +115,7 @@ struct TranscriptText: View {
                     .padding(.horizontal, 2)
                     .background(
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(hovered == token.id ? Color.primary.opacity(0.08) : .clear)
+                            .fill(background(for: token))
                     )
                     .contentShape(Rectangle())
                     .onHover { isInside in
@@ -112,6 +131,25 @@ struct TranscriptText: View {
     private func isActive(_ token: WordToken) -> Bool {
         guard let activeWordIndex else { return false }
         return token.range.contains(activeWordIndex)
+    }
+
+    /// Search matches tint whole tokens rather than the exact characters: a
+    /// token is one clickable thing, and half of one lit is harder to read
+    /// than all of it.
+    private func background(for token: WordToken) -> Color {
+        if let currentSearchMatch, covers(token, currentSearchMatch) {
+            return .orange.opacity(0.55)
+        }
+        if searchMatches.contains(where: { covers(token, $0) }) {
+            return .yellow.opacity(0.35)
+        }
+        return hovered == token.id ? Color.primary.opacity(0.08) : .clear
+    }
+
+    /// Whether a match falls anywhere in the characters this token covers.
+    private func covers(_ token: WordToken, _ match: TranscriptMatch) -> Bool {
+        token.textRange.lowerBound < match.range.upperBound
+            && match.range.lowerBound < token.textRange.upperBound
     }
 }
 

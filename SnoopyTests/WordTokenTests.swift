@@ -81,6 +81,38 @@ struct WordTokenTests {
         #expect(tokens.map(\.text) == ["Hej", "du"])
     }
 
+    @Test("A token knows where it sits in the turn's text")
+    func tokenTextRangesMatchTheJoinedText() {
+        // Search highlighting compares match offsets against these, so they
+        // have to describe the very string the matches were found in.
+        let words = [
+            WordSpan(word: "Right", start: 0, end: 1),
+            WordSpan(word: ",", start: 1, end: 1.1),
+            WordSpan(word: "shall", start: 1.2, end: 1.6),
+            WordSpan(word: "we", start: 1.7, end: 2),
+            WordSpan(word: "start", start: 2.1, end: 2.6),
+            WordSpan(word: "?", start: 2.6, end: 2.7),
+        ]
+        let text = SpeakerAligner.joined(words)
+
+        for token in WordToken.tokens(from: words) {
+            let start = text.index(text.startIndex, offsetBy: token.textRange.lowerBound)
+            let end = text.index(text.startIndex, offsetBy: token.textRange.upperBound)
+            #expect(String(text[start..<end]) == token.text)
+        }
+    }
+
+    @Test("A folded token's range covers the punctuation it swallowed")
+    func foldedTokenRangeIncludesPunctuation() {
+        let words = [
+            WordSpan(word: "Right", start: 0, end: 1),
+            WordSpan(word: ",", start: 1, end: 1.1),
+        ]
+        let token = WordToken.tokens(from: words)[0]
+        #expect(token.text == "Right,")
+        #expect(token.textRange == 0..<6)
+    }
+
     // MARK: - Which word is highlighted
 
     /// Word timings abut: one word's end is the next word's start, for 85–95%

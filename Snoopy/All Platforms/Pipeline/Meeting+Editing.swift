@@ -192,6 +192,114 @@ nonisolated extension Meeting {
         utterances[index].isEdited = true
     }
 
+    // MARK: - Search and replace
+
+    /// Replaces one search match, keeping the recording's word timings where
+    /// the match allows it.
+    ///
+    /// The point of the distinction: a transcript's word timings are what make
+    /// clicking a word seek to it, and they cannot be recovered once dropped —
+    /// only re-transcribing brings them back. Fixing a name the model
+    /// consistently misheard should not cost that, and it doesn't have to,
+    /// because such a fix lives inside a single word: rewrite that word's text
+    /// and its start and end still describe when it was said.
+    ///
+    /// A match spanning several words is a different matter. There is no
+    /// honest way to time the replacement, so the turn falls back to the same
+    /// terms as a hand edit — timings dropped, marked as edited.
+    ///
+    /// - Returns: What it cost, or nil if the match no longer fits the text.
+    @discardableResult
+    mutating func replace(
+        _ match: TranscriptMatch,
+        with replacement: String
+    ) -> TranscriptSearch.ReplacementKind? {
+
+        guard let index = utterances.firstIndex(where: { $0.id == match.utteranceID })
+        else { return nil }
+
+        let utterance = utterances[index]
+        let text = utterance.text
+
+        // The transcript may have changed under a match found earlier.
+        guard match.offset >= 0, match.offset + match.length <= text.count
+        else { return nil }
+
+        if let words = utterance.words,
+           let word = TranscriptSearch.enclosingWord(of: match, in: words) {
+
+            // Rewrite just this word, and rebuild the text from the words so
+            // the two cannot drift apart.
+            // A span's word and its timings are both set at transcription and
+            // immutable after, so this is a new span carrying the old timings
+            // rather than a mutation of the old one.
+            var updated = words
+            let old = words[word.index]
+            updated[word.index] = WordSpan(
+                word: Self.replacing(
+                    in: old.word,
+                    offset: match.offset - word.range.lowerBound,
+                    length: match.length,
+                    with: replacement
+                ),
+                start: old.start,
+                end: old.end
+            )
+
+            // A replacement that empties a word would leave a span timing
+            // nothing, so drop it rather than keep a ghost.
+            updated.removeAll { $0.word.isEmpty }
+
+            utterances[index].words = updated
+            utterances[index].text = SpeakerAligner.joined(updated)
+            return .keepsTimings
+        }
+
+        utterances[index].text = Self.replacing(
+            in: text, offset: match.offset, length: match.length, with: replacement
+        )
+        utterances[index].words = nil
+        utterances[index].isEdited = true
+        return .dropsTimings
+    }
+
+    /// Replaces every occurrence of `query`, back to front so that earlier
+    /// offsets stay valid as the text changes underneath them.
+    ///
+    /// - Returns: How many turns kept their timings, and how many lost them.
+    @discardableResult
+    mutating func replaceAll(
+        _ query: String,
+        with replacement: String
+    ) -> (kept: Int, dropped: Int) {
+
+        var kept = 0
+        var dropped = 0
+
+        for match in TranscriptSearch.matches(for: query, in: utterances).reversed() {
+            switch replace(match, with: replacement) {
+            case .keepsTimings: kept += 1
+            case .dropsTimings: dropped += 1
+            case nil: break
+            }
+        }
+        return (kept, dropped)
+    }
+
+    /// Character-offset substring replacement, since matches carry offsets
+    /// rather than indices into a string that may have moved on.
+    private static func replacing(
+        in text: String,
+        offset: Int,
+        length: Int,
+        with replacement: String
+    ) -> String {
+        guard offset >= 0, offset + length <= text.count else { return text }
+        let start = text.index(text.startIndex, offsetBy: offset)
+        let end = text.index(start, offsetBy: length)
+        return text.replacingCharacters(in: start..<end, with: replacement)
+    }
+
     // MARK: - Helpers
 
     private static func weightedMean(
