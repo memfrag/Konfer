@@ -132,17 +132,31 @@ nonisolated struct EnrollmentSuggestion: Codable, Hashable, Sendable {
 /// Whisper's own language, without which it detects one per chunk and flips
 /// mid-recording on Swedish speech containing English terms.
 ///
+/// It is the only such choice: the model follows from it, English to Apple's
+/// transcriber and Swedish to KB-Whisper Large, so there is nothing else for
+/// the user to get wrong. A wrong language, though, doesn't degrade an hour of
+/// transcript so much as replace it with something else.
+///
 public nonisolated enum MeetingLanguage: String, Codable, CaseIterable, Sendable {
-    case auto
     case swedish
     case english
 
     public var displayName: String {
         switch self {
-        case .auto: "Auto"
         case .swedish: "Swedish"
         case .english: "English"
         }
+    }
+
+    /// Meetings written before the automatic option was removed say `"auto"`,
+    /// which always resolved to Swedish: it never reached Apple's transcriber,
+    /// and Whisper was pinned to `sv` for it. Decoding it as anything else
+    /// would relabel those transcripts; failing to decode it would drop them
+    /// from the library entirely, since ``MeetingStore`` skips what it cannot
+    /// read.
+    public init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = MeetingLanguage(rawValue: raw) ?? .swedish
     }
 }
 

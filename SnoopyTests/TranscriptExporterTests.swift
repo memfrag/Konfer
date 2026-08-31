@@ -26,7 +26,7 @@ struct TranscriptExporterTests {
             audioPath: "/tmp/kickoff.wav",
             duration: 4000,
             importedAt: Date(),
-            language: .auto,
+            language: .swedish,
             speakers: [SpeakerLabel(id: "A", name: "Anna", isNamed: true)],
             utterances: utterances
         )

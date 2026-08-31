@@ -6,9 +6,10 @@ import SwiftUI
 
 /// Which model transcribes, and what that costs.
 ///
-/// The trade-off here is large enough to be worth showing rather than hiding:
-/// on real Swedish meeting audio the models differ from "unreadable" to
-/// "essentially clean", and from one minute per hour of audio to nine.
+/// There is nothing to choose here: the language of a recording decides its
+/// model. It is still worth showing rather than hiding, because the two differ
+/// by a factor of nine in speed and by 2.9 GB on disk, and a user who knows
+/// that can read the progress bar rather than wonder about it.
 struct TranscriptionSettingsTab: View {
 
     @Environment(AppSettings.self) private var appSettings
@@ -19,33 +20,25 @@ struct TranscriptionSettingsTab: View {
 
         Form {
             Section {
-                Picker("Model:", selection: $appSettings.asrBackend) {
-                    ForEach(ASRBackendKind.allCases, id: \.self) { kind in
-                        Text(kind.displayName).tag(kind)
+                ForEach(MeetingLanguage.allCases, id: \.self) { language in
+                    LabeledContent(language.displayName) {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(ASRBackendKind(transcribing: language).displayName)
+                            Text("about \(minutes(for: language)) per hour of audio")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                }
-                .onChange(of: appSettings.asrBackend) { _, kind in
-                    pipeline.selectedBackend = kind
-                }
-
-                Text(appSettings.asrBackend.summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                LabeledContent("An hour of audio takes") {
-                    Text("about \(minutes) on this Mac")
-                        .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("Speech Recognition")
             } footer: {
                 Text(
-                    "Apple's recognition covers 30 locales, and Swedish isn't "
-                    + "one of them. KB-Whisper is the National Library of "
-                    + "Sweden's Whisper model, trained on more than 50,000 hours "
-                    + "of Swedish. A change applies to the next recording you "
-                    + "transcribe; anything already queued keeps what it started "
-                    + "with."
+                    "The language you pick for a recording decides which model "
+                    + "transcribes it. Apple's recognition covers 30 locales, "
+                    + "and Swedish isn't one of them. KB-Whisper is the National "
+                    + "Library of Sweden's Whisper model, trained on more than "
+                    + "50,000 hours of Swedish."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -72,13 +65,13 @@ struct TranscriptionSettingsTab: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            pipeline.selectedBackend = appSettings.asrBackend
             pipeline.fastTranscription = appSettings.fastTranscription
         }
     }
 
-    private var minutes: String {
-        let value = appSettings.asrBackend.estimatedMinutesPerHourOfAudio
+    private func minutes(for language: MeetingLanguage) -> String {
+        let value = ASRBackendKind(transcribing: language)
+            .estimatedMinutesPerHourOfAudio
         return value < 2 ? "a minute" : "\(Int(value)) minutes"
     }
 }

@@ -56,12 +56,13 @@ actor WhisperKitBackend: TranscriptionBackend {
 
     /// Whisper's language code for a meeting's declared language.
     ///
-    /// `.auto` maps to Swedish rather than to nil: per-chunk detection is
-    /// actively harmful on this material, and Whisper still handles English
-    /// stretches inside a Swedish-pinned file perfectly well.
-    private nonisolated static func whisperLanguage(for language: MeetingLanguage) -> String? {
+    /// Never nil: letting Whisper detect the language means detecting it per
+    /// chunk, which is actively harmful on this material. A pinned language
+    /// still handles English stretches inside a Swedish file perfectly well,
+    /// which is why the user is asked to declare one rather than guess.
+    private nonisolated static func whisperLanguage(for language: MeetingLanguage) -> String {
         switch language {
-        case .auto, .swedish: "sv"
+        case .swedish: "sv"
         case .english: "en"
         }
     }

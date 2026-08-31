@@ -42,8 +42,12 @@ no timestamps at all, and asking it for them (`<|timestamp|>`) makes its decoder
 degenerate into a repetition loop. Parakeet was removed once Apple's transcriber
 covered English better than it did.
 
-Settings ▸ Transcription picks the model. **Automatic** — the default — sends
-English to Apple and everything else to KB-Whisper Large.
+There is no model picker. Each row above has one sensible reading, so the
+language you declare for a recording decides: **English goes to Apple**, nine
+times faster and with nothing to download, and **Swedish goes to KB-Whisper
+Large**, because Apple has no Swedish at all. Settings ▸ Transcription shows the
+routing and what each costs. `SNOOPY_BACKEND` forces one model regardless, for
+comparing them on the same recording.
 
 ## What a real meeting costs
 
@@ -164,7 +168,12 @@ seconds.
 Left to detect language itself, Whisper decides **per VAD chunk** — and a
 Swedish meeting sprinkled with "stakeholder" and "AI" makes chunks flip
 language, which silently merges text from unrelated parts of the recording.
-Snoopy always pins the language, treating Auto as Swedish.
+Snoopy always pins the language.
+
+Which is why there is no automatic setting and no default: the import sheet
+opens with the language unset and will not start until one is chosen. Guessing
+picks the model, and a wrong guess doesn't degrade an hour of transcript so much
+as replace it with something else.
 
 ## Reading
 

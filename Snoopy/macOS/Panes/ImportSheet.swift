@@ -11,6 +11,10 @@ import SwiftUI
 /// everything else to KB-Whisper, and it stops Whisper detecting a language
 /// per chunk — which on a Swedish meeting full of English loanwords makes it
 /// flip mid-recording.
+///
+/// It is also the only choice worth making: the model follows from it. An hour
+/// of audio sent to the wrong one comes back as an hour of wrong words, so the
+/// picker sits at the top of the sheet rather than in Settings.
 struct ImportSheet: View {
 
     let url: URL
@@ -23,7 +27,7 @@ struct ImportSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var language: MeetingLanguage = .auto
+    @State private var language: MeetingLanguage = .english
     @State private var knowsSpeakerCount = false
     @State private var speakerCount = 4
 
@@ -52,8 +56,8 @@ struct ImportSheet: View {
                 }
                 .help(
                     "The language decides which model transcribes: English goes "
-                    + "to Apple's built-in recognition, everything else to "
-                    + "KB-Whisper. Auto is treated as Swedish."
+                    + "to Apple's built-in recognition, Swedish to KB-Whisper "
+                    + "Large."
                 )
 
                 Toggle("I know how many people spoke", isOn: $knowsSpeakerCount)

@@ -18,9 +18,10 @@ import Speech
 actor AppleSpeechBackend: TranscriptionBackend {
 
     /// Languages Apple's transcriber can actually handle, as far as Snoopy is
-    /// concerned.
+    /// concerned. The pipeline checks this before it starts; the guard in
+    /// ``transcribe(_:progress:)`` is the backstop.
     static func supports(_ language: MeetingLanguage) -> Bool {
-        language == .english
+        ASRBackendKind.appleSpeech.supports(language)
     }
 
     private var isReady = false

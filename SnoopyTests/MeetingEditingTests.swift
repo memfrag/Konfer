@@ -41,7 +41,7 @@ struct MeetingEditingTests {
             audioPath: "/tmp/standup.m4a",
             duration: 6,
             importedAt: Date(),
-            language: .auto,
+            language: .swedish,
             speakers: [
                 SpeakerLabel(id: "A", name: "Speaker 1", embedding: [1, 0], totalDuration: 2),
                 SpeakerLabel(id: "B", name: "Speaker 2", embedding: [0, 1], totalDuration: 2)

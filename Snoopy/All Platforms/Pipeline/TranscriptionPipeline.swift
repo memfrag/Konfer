@@ -26,8 +26,7 @@ final class TranscriptionPipeline {
         let title: String
         let language: MeetingLanguage
         let expectedSpeakers: Int?
-        /// Captured when the job is queued, so changing the setting mid-queue
-        /// doesn't silently change what a waiting job will use.
+        /// Follows from `language`, unless overridden for benchmarking.
         let backend: ASRBackendKind
         let fastTranscription: Bool
     }
@@ -84,8 +83,14 @@ final class TranscriptionPipeline {
     @ObservationIgnored private let speakerStore: SpeakerStore
     @ObservationIgnored private var runTask: Task<Void, Never>?
 
-    /// Which model new jobs will use. Read from settings by the caller.
-    var selectedBackend: ASRBackendKind = .default
+    /// Forces one model regardless of language, for comparing models on the
+    /// same recording. Unset in normal use, where the language decides.
+    ///
+    /// `SNOOPY_BACKEND=apple-speech|kb-whisper-small|kb-whisper-large`
+    @ObservationIgnored
+    static let backendOverride: ASRBackendKind? = ProcessInfo.processInfo
+        .environment["SNOOPY_BACKEND"]
+        .flatMap(ASRBackendKind.init(rawValue:))
 
     /// Whether new jobs trade completeness for speed. Read from settings.
     var fastTranscription = false
@@ -106,7 +111,7 @@ final class TranscriptionPipeline {
 
     func enqueue(
         _ url: URL,
-        language: MeetingLanguage = .auto,
+        language: MeetingLanguage,
         expectedSpeakers: Int? = nil
     ) {
         let job = Job(
@@ -114,7 +119,7 @@ final class TranscriptionPipeline {
             title: url.deletingPathExtension().lastPathComponent,
             language: language,
             expectedSpeakers: expectedSpeakers,
-            backend: selectedBackend,
+            backend: Self.backendOverride ?? ASRBackendKind(transcribing: language),
             fastTranscription: fastTranscription
         )
         queue.append(job)
@@ -165,6 +170,13 @@ final class TranscriptionPipeline {
         defer { prepared?.cleanUp() }
 
         do {
+            // 0. The chosen model has to be able to speak the chosen language.
+            //    Checked before anything else: diarization takes a minute on a
+            //    long recording, and failing after it would waste all of it.
+            guard job.backend.supports(job.language) else {
+                throw PipelineError.languageUnsupported(job.language)
+            }
+
             // 1. Normalize the input. Video files get their audio extracted to a
             //    temporary file; audio files pass straight through.
             let audio = try await AudioSourcePreparer.prepare(job.sourceURL)
@@ -202,7 +214,7 @@ final class TranscriptionPipeline {
 
             // 3. Speech recognition. This one is load-bearing: speaker segments
             //    with no words have no use, so a failure fails the run.
-            let backend = await registry.backend(for: job.backend.resolved(for: job.language))
+            let backend = await registry.backend(for: job.backend)
             if await !backend.isPrepared { stage = .preparingModels(0) }
             do {
                 try await backend.prepare { [weak self] fraction in

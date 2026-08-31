@@ -20,28 +20,41 @@ import Foundation
 /// with nothing for Snoopy to download or manage, but its 30 supported locales
 /// do not include Swedish — which is why both are here.
 ///
+/// Which one runs is not a preference. The table above only has one sensible
+/// reading of each row: Apple for English, because it is nine times faster and
+/// downloads nothing macOS doesn't already have, and KB-Whisper Large for
+/// Swedish, because Apple has no Swedish at all. So the language decides, and
+/// there is no model picker to get wrong.
+///
 public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable {
 
-    /// English goes to Apple, everything else to KB-Whisper Large.
-    case automatic
     case appleSpeech = "apple-speech"
     case kbWhisperSmall = "kb-whisper-small"
     case kbWhisperLarge = "kb-whisper-large"
 
-    public static let `default` = ASRBackendKind.automatic
+    /// The model that transcribes a given language.
+    public init(transcribing language: MeetingLanguage) {
+        switch language {
+        case .english: self = .appleSpeech
+        case .swedish: self = .kbWhisperLarge
+        }
+    }
 
-    /// The backend that actually runs, once the meeting's language is known.
+    /// Whether this model can transcribe a language at all.
     ///
-    /// Apple's transcriber has no Swedish, so `.automatic` sends anything but
-    /// English to KB-Whisper rather than failing.
-    public func resolved(for language: MeetingLanguage) -> ASRBackendKind {
-        guard self == .automatic else { return self }
-        return language == .english ? .appleSpeech : .kbWhisperLarge
+    /// Unreachable through the app, where the language picks the model. It
+    /// guards the `SNOOPY_BACKEND` override, which can name a model that has
+    /// no business with the recording's language: the run then fails
+    /// immediately rather than after diarization has spent a minute on it.
+    public func supports(_ language: MeetingLanguage) -> Bool {
+        switch self {
+        case .appleSpeech: language == .english
+        case .kbWhisperSmall, .kbWhisperLarge: true
+        }
     }
 
     public var displayName: String {
         switch self {
-        case .automatic: "Automatic"
         case .appleSpeech: "Apple Speech — English only"
         case .kbWhisperSmall: "KB-Whisper Small — balanced"
         case .kbWhisperLarge: "KB-Whisper Large — most accurate"
@@ -50,9 +63,6 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
 
     public var summary: String {
         switch self {
-        case .automatic:
-            "Apple's built-in recognition for English, KB-Whisper Large for "
-            + "Swedish and anything else."
         case .appleSpeech:
             "Apple's on-device recognition. Fast, nothing to download, and "
             + "English only — it has no Swedish."
@@ -66,7 +76,7 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
     /// Rough wall-clock for an hour of audio, for the Settings picker.
     public var estimatedMinutesPerHourOfAudio: Double {
         switch self {
-        case .automatic, .appleSpeech: 1
+        case .appleSpeech: 1
         case .kbWhisperSmall: 2
         case .kbWhisperLarge: 9
         }

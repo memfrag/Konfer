@@ -19,7 +19,7 @@ actor BackendRegistry {
         if let existing = backends[kind] { return existing }
 
         let backend: any TranscriptionBackend = switch kind {
-        case .automatic, .appleSpeech: AppleSpeechBackend()
+        case .appleSpeech: AppleSpeechBackend()
         case .kbWhisperSmall: WhisperKitBackend(variant: .small)
         case .kbWhisperLarge: WhisperKitBackend(variant: .large)
         }

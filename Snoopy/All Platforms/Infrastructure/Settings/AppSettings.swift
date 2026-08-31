@@ -23,9 +23,6 @@ import KeyValueStore
         /// The preferred color scheme for the app.
         case colorScheme
 
-        /// Which speech recognition model to transcribe with.
-        case asrBackend
-
         /// Whether to trade completeness for speed when transcribing.
         case fastTranscription
 
@@ -42,17 +39,6 @@ import KeyValueStore
         }
     }
     
-    /// The speech recognition model new transcriptions will use.
-    ///
-    /// Defaults to KB-Whisper Large: on real Swedish meeting audio it is the
-    /// only option that reliably produces readable text. Parakeet remains
-    /// selectable for its speed.
-    public var asrBackend: ASRBackendKind {
-        didSet {
-            store.save(asrBackend.rawValue, for: .asrBackend)
-        }
-    }
-
     /// Transcribe in parallel chunks: roughly twice as fast, and incomplete.
     ///
     /// Off by default. Chunked transcription drops speech and, worse, does so
@@ -88,8 +74,5 @@ import KeyValueStore
         
         fastTranscription = self.store.load(.fastTranscription, default: false)
         recordingFolder = self.store.load(.recordingFolder, default: "")
-        asrBackend = ASRBackendKind(
-            rawValue: self.store.load(.asrBackend, default: ASRBackendKind.default.rawValue)
-        ) ?? .default
     }
 }

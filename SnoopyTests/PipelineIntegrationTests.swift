@@ -36,14 +36,15 @@ struct PipelineIntegrationTests {
     /// model; defaults to whatever the app defaults to.
     nonisolated static var backend: ASRBackendKind {
         ProcessInfo.processInfo.environment["SNOOPY_BACKEND"]
-            .flatMap(ASRBackendKind.init(rawValue:)) ?? .default
+            .flatMap(ASRBackendKind.init(rawValue:))
+            ?? ASRBackendKind(transcribing: language)
     }
 
-    /// `SNOOPY_LANGUAGE=auto|swedish|english` tags the meeting, which is what
-    /// routes `.automatic` between Apple Speech and KB-Whisper.
+    /// `SNOOPY_LANGUAGE=swedish|english` tags the meeting. The model no longer
+    /// follows from it — a mismatch fails the run rather than being rerouted.
     nonisolated static var language: MeetingLanguage {
         ProcessInfo.processInfo.environment["SNOOPY_LANGUAGE"]
-            .flatMap(MeetingLanguage.init(rawValue:)) ?? .auto
+            .flatMap(MeetingLanguage.init(rawValue:)) ?? .swedish
     }
 
     nonisolated static var usesRealLibrary: Bool {
@@ -75,10 +76,9 @@ struct PipelineIntegrationTests {
             meetingStore: meetingStore,
             speakerStore: speakerStore
         )
-        pipeline.selectedBackend = Self.backend
         pipeline.fastTranscription =
             ProcessInfo.processInfo.environment["SNOOPY_FAST"] == "1"
-        print("backend: \(Self.backend.resolved(for: Self.language).rawValue) (language: \(Self.language.rawValue))")
+        print("backend: \(Self.backend.rawValue) (language: \(Self.language.rawValue))")
 
         // Sample the stage as it changes, so the run reports where the time
         // actually went rather than one opaque total.

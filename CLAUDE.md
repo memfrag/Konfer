@@ -46,7 +46,9 @@ TEST_RUNNER_SNOOPY_AUDIO=/path/to/meeting.wav \
 `SNOOPY_RECORD_APP`. Keep test parallelization off — two runner processes sharing
 one model cache corrupt each other's download.
 
-Runtime overrides for experiments: `SNOOPY_CHUNKING=vad`, `SNOOPY_SLICES=1`,
+Runtime overrides for experiments: `SNOOPY_BACKEND` (forces a model, including
+the otherwise unreachable `kb-whisper-small`), `SNOOPY_CHUNKING=vad`,
+`SNOOPY_SLICES=1`,
 `SNOOPY_WHISPER_VERBOSE=1`, `SNOOPY_VAD_PADDING`, `SNOOPY_RECORD_DIAGNOSTICS=1`,
 and `APP_ENVIRONMENT=mock` to launch against `AppEnvironment.mock()`.
 
@@ -95,9 +97,17 @@ Stages run in sequence, never in parallel — both saturate the Neural Engine.
 Diarization failure is survivable and marks the meeting `degraded`; ASR failure
 fails the run. Nothing partial is ever persisted, so there is no resume state.
 
-**Backends.** `ASRBackendKind` selects `AppleSpeechBackend` (English) or
-`WhisperKitBackend` (KB-Whisper small/large, everything else, Auto treated as
-Swedish). `BackendRegistry` is an actor that keeps loaded models resident;
+**Backends.** The model is derived, not chosen: `ASRBackendKind(transcribing:)`
+maps English to `AppleSpeechBackend` and Swedish to `WhisperKitBackend`
+(KB-Whisper Large). There is no model setting and no automatic case in either
+enum — the user declares the language in `ImportSheet` (defaulting to English)
+and everything follows. `SNOOPY_BACKEND` overrides the mapping for benchmarking,
+which is the only way to reach a model/language mismatch; `TranscriptionPipeline`
+guards that case up front, before diarization spends a minute on the file.
+Transcripts written before the automatic option went away say `"auto"` on disk
+and decode as Swedish, which is what they ran as; `MeetingStore` silently drops
+what it cannot decode, so that fallback is load-bearing.
+`BackendRegistry` is an actor that keeps loaded models resident;
 Settings ▸ Models calls `unloadAll()` before deleting model files from disk.
 Long recordings are cut into at most 4 coarse slices at real silences and
 transcribed concurrently — WhisperKit's own chunking is deliberately off.
