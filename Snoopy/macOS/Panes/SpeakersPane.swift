@@ -127,7 +127,9 @@ struct SpeakersPane: View {
     }
 }
 
+#if DEBUG
 #Preview {
     SpeakersPane()
         .previewEnvironment()
 }
+#endif

@@ -189,7 +189,9 @@ extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
 }
 
+#if DEBUG
 #Preview {
     Sidebar()
         .previewEnvironment()
 }
+#endif

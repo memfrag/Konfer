@@ -94,7 +94,9 @@ struct TranscriptionSettingsTab: View {
     }
 }
 
+#if DEBUG
 #Preview {
     TranscriptionSettingsTab()
         .previewEnvironment()
 }
+#endif

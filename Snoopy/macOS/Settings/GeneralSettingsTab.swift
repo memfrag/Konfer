@@ -24,7 +24,9 @@ struct GeneralSettingsTab: View {
     }
 }
 
+#if DEBUG
 #Preview {
     GeneralSettingsTab()
         .previewEnvironment()
 }
+#endif

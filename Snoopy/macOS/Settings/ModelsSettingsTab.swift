@@ -121,7 +121,9 @@ struct ModelsSettingsTab: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ModelsSettingsTab()
         .previewEnvironment()
 }
+#endif

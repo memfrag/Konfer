@@ -116,7 +116,9 @@ private extension View {
     }
 }
 
+#if DEBUG
 #Preview {
     SidebarFooter()
         .previewEnvironment()
 }
+#endif

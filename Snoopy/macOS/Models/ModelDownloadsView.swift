@@ -190,7 +190,9 @@ struct ModelDownloadsView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ModelDownloadsView()
         .previewEnvironment()
 }
+#endif

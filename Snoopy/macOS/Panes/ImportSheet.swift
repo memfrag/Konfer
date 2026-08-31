@@ -147,6 +147,7 @@ struct ImportSheet: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ImportSheet(
         url: URL(fileURLWithPath: "/tmp/Standup.m4a"),
@@ -156,3 +157,4 @@ struct ImportSheet: View {
     )
     .previewEnvironment()
 }
+#endif

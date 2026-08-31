@@ -129,7 +129,9 @@ struct WelcomeView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     WelcomeView { _ in }
         .previewEnvironment()
 }
+#endif
