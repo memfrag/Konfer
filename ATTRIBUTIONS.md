@@ -6,6 +6,11 @@ Snoopy itself is released under the BSD Zero Clause License — see [LICENSE](LI
 The components below are a different matter. They are other people's work, and
 some of their licences do ask for attribution, which is what this file is for.
 
+The same list is shown inside the app, from the About window, and is built in
+`MacApp.swift`. Change one and change the other — with the exception of Apple's
+own frameworks, which appear here but not there, because macOS is not software
+included in this product.
+
 Two of them are worth calling out before the lists:
 
 - **The speaker diarization models are CC BY 4.0**, which *requires*
