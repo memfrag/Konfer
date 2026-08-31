@@ -15,7 +15,7 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 # --- Constants ---
-SCHEME="Snoopy"
+SCHEME="Snoopy (Release)"
 APP_NAME="Snoopy"
 KEYCHAIN_PROFILE="notary"
 SPARKLE_VERSION="2.9.1"
@@ -29,7 +29,6 @@ SPARKLE_TOOLS_DIR="$PROJECT_DIR/Sparkle-tools"
 ARCHIVE_PATH="$BUILD_DIR/$APP_NAME.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
 EXPORT_OPTIONS="$SCRIPT_DIR/ExportOptions.plist"
-INFO_PLIST="$PROJECT_DIR/$APP_NAME/Info.plist"
 PBXPROJ="$PROJECT_DIR/$APP_NAME.xcodeproj/project.pbxproj"
 
 # --- Helpers ---
@@ -55,10 +54,8 @@ fi
 
 # --- Version checking ---
 echo "==> Checking version..."
-CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null || true)
-if [ -z "$CURRENT_VERSION" ]; then
-    CURRENT_VERSION=$(grep 'MARKETING_VERSION' "$PBXPROJ" | head -1 | sed 's/.*= *//;s/ *;.*//' || true)
-fi
+CURRENT_VERSION=$(grep 'MARKETING_VERSION' "$PBXPROJ" | head -1 | sed 's/.*= *//;s/ *;.*//' || true)
+[ -n "$CURRENT_VERSION" ] || error "Could not read MARKETING_VERSION from project.pbxproj."
 echo "    Current version: $CURRENT_VERSION"
 
 LATEST_TAG=$(gh release view --repo "$GITHUB_REPO" --json tagName -q '.tagName' 2>/dev/null || true)
@@ -89,41 +86,27 @@ fi
 
 if [ "$VERSION" != "$CURRENT_VERSION" ]; then
     echo "==> Updating version to $VERSION..."
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO_PLIST" 2>/dev/null \
-        || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$INFO_PLIST" \
-        || error "Failed to update CFBundleShortVersionString in Info.plist"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO_PLIST" 2>/dev/null \
-        || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$INFO_PLIST" \
-        || error "Failed to update CFBundleVersion in Info.plist"
     sed -i '' "s/MARKETING_VERSION = [^;]*/MARKETING_VERSION = $VERSION/" "$PBXPROJ" || error "Failed to update MARKETING_VERSION in project.pbxproj"
     sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*/CURRENT_PROJECT_VERSION = $VERSION/" "$PBXPROJ" || error "Failed to update CURRENT_PROJECT_VERSION in project.pbxproj"
     cd "$PROJECT_DIR"
-    git add "$INFO_PLIST" "$PBXPROJ"
+    git add "$PBXPROJ"
     git commit -m "Bump version to $VERSION"
     git push origin HEAD
     echo "    Version updated and pushed."
-else
-    # Ensure Info.plist matches even if no bump needed
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO_PLIST" 2>/dev/null \
-        || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$INFO_PLIST" 2>/dev/null || true
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO_PLIST" 2>/dev/null \
-        || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$INFO_PLIST" 2>/dev/null || true
 fi
 
 TAG="$VERSION"
 
 # --- Archive ---
 echo "==> Archiving..."
-xcodebuild archive \
+if ! xcodebuild archive \
     -project "$PROJECT_DIR/$APP_NAME.xcodeproj" \
     -scheme "$SCHEME" \
     -archivePath "$ARCHIVE_PATH" \
     -configuration Release \
     -arch arm64 \
     ENABLE_HARDENED_RUNTIME=YES \
-    2>&1 | tee "$BUILD_DIR/archive.log" | tail -5
-
-if [ ! -d "$ARCHIVE_PATH" ]; then
+    2>&1 | tee "$BUILD_DIR/archive.log" | tail -5 || [ ! -d "$ARCHIVE_PATH" ]; then
     echo "--- Last 30 lines of archive.log ---"
     tail -30 "$BUILD_DIR/archive.log"
     error "Archive failed. See $BUILD_DIR/archive.log for details."
@@ -132,14 +115,12 @@ echo "    Archive created."
 
 # --- Export ---
 echo "==> Exporting..."
-xcodebuild -exportArchive \
+APP_PATH="$EXPORT_DIR/$APP_NAME.app"
+if ! xcodebuild -exportArchive \
     -archivePath "$ARCHIVE_PATH" \
     -exportPath "$EXPORT_DIR" \
     -exportOptionsPlist "$EXPORT_OPTIONS" \
-    2>&1 | tee "$BUILD_DIR/export.log" | tail -5
-
-APP_PATH="$EXPORT_DIR/$APP_NAME.app"
-if [ ! -d "$APP_PATH" ]; then
+    2>&1 | tee "$BUILD_DIR/export.log" | tail -5 || [ ! -d "$APP_PATH" ]; then
     echo "--- Last 30 lines of export.log ---"
     tail -30 "$BUILD_DIR/export.log"
     error "Export failed. See $BUILD_DIR/export.log for details."
@@ -149,6 +130,9 @@ echo "    Export complete."
 # --- Read version from exported app ---
 EXPORTED_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist")
 echo "    Exported app version: $EXPORTED_VERSION"
+if [ "$EXPORTED_VERSION" != "$VERSION" ]; then
+    error "Exported app is version $EXPORTED_VERSION, expected $VERSION. The bump did not reach the build settings."
+fi
 
 # --- Create DMG ---
 echo "==> Creating DMG..."
@@ -179,7 +163,9 @@ xcrun stapler staple "$DMG_PATH" || error "Stapling failed."
 echo "    Stapled."
 
 # --- Sign for Sparkle ---
-echo "==> Signing for Sparkle..."
+# generate_appcast signs the entry itself further down; this call is here to
+# fail on missing EdDSA keys before a GitHub release has been published.
+echo "==> Checking Sparkle signing key..."
 "$SPARKLE_TOOLS_DIR/bin/sign_update" "$DMG_PATH" || error "Sparkle signing failed."
 
 # --- Prompt for release title ---
