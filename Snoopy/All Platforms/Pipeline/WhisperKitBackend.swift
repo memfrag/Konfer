@@ -191,9 +191,8 @@ actor WhisperKitBackend: TranscriptionBackend {
         // Pinning the language matters more than it looks. Left to detect,
         // Whisper decides per VAD chunk, and a Swedish meeting sprinkled with
         // "stakeholder" and "AI" makes chunks flip language — which produces
-        // text merged from the wrong parts of the recording. Auto stays
-        // available, but Swedish is the default because that is what these
-        // recordings are.
+        // text merged from the wrong parts of the recording. The language is
+        // always declared, so there is nothing to detect.
         let options = DecodingOptions(
             verbose: false,
             task: .transcribe,
