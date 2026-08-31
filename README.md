@@ -267,4 +267,10 @@ LLM post-processing. Snoopy transcribes files and stops.
 
 ## License
 
-See the LICENSE file for licensing information.
+Snoopy is released under the [BSD Zero Clause License](LICENSE) — do what you
+like with it, no attribution required.
+
+Its dependencies and the speech models it downloads are other people's work,
+under their own licences, and one of them (the speaker diarization models,
+CC BY 4.0) does require attribution. They are all listed in
+[ATTRIBUTIONS.md](ATTRIBUTIONS.md).
