@@ -84,24 +84,25 @@ Snoopy fetches CoreML conversions of them:
 | [FluidAudio](https://github.com/FluidInference/FluidAudio) | 0.15.6 | Fluid Inference |
 | [swift-argument-parser](https://github.com/apple/swift-argument-parser) | 1.8.2 | © 2020 Apple Inc. and the Swift project authors |
 
-### Licence not stated
+### The Unlicense
 
-| Package | Version | Note |
+| Package | Version | Copyright |
 |---|---|---|
-| [Zipcode](https://github.com/apparata/Zipcode) | 1.0.1 | Resolved as a dependency, but the repository carries no licence file. |
+| [Zipcode](https://github.com/apparata/Zipcode) | 1.0.1 | Released into the public domain by Apparata AB |
 
 ---
 
-## Code bundled inside FluidAudio
+## Code bundled inside those packages
 
-FluidAudio vendors these rather than depending on them, so they ship inside
-Snoopy along with it.
+These are vendored rather than depended on, so they ship inside Snoopy along
+with the package that carries them.
 
-| Component | Licence | Copyright |
-|---|---|---|
-| [fastcluster](https://github.com/fastcluster/fastcluster) | BSD-2-Clause | © 2011 Daniel Müllner; changes from v1.1.24 © Google Inc. |
-| [VBx](https://github.com/BUTSpeechFIT/VBx) | Apache-2.0 | BUT Speech@FIT, Brno University of Technology |
-| [text-processing-rs](https://github.com/FluidInference/text-processing-rs) | Apache-2.0 | Fluid Inference |
+| Component | Inside | Licence | Copyright |
+|---|---|---|---|
+| [fastcluster](https://github.com/fastcluster/fastcluster) | FluidAudio | BSD-2-Clause | © 2011 Daniel Müllner; changes from v1.1.24 © Google Inc. |
+| [VBx](https://github.com/BUTSpeechFIT/VBx) | FluidAudio | Apache-2.0 | BUT Speech@FIT, Brno University of Technology |
+| [text-processing-rs](https://github.com/FluidInference/text-processing-rs) | FluidAudio | Apache-2.0 | Fluid Inference |
+| [swift-transformers](https://github.com/huggingface/swift-transformers) | WhisperKit | Apache-2.0 | © 2022 Hugging Face SAS, modified by Argmax, Inc. |
 
 Snoopy's diarization is the pyannote community-1 pipeline reimplemented in
 Swift by FluidAudio: pyannote segmentation, speaker embeddings, and
@@ -112,9 +113,19 @@ refinement.
 
 ## How this list was produced
 
-The Swift package licences and copyright lines were read from the `LICENSE`
-files in the resolved checkouts of the versions pinned in
-`Package.resolved` — not from memory or from the packages' READMEs. The model
-licences were read from the Hugging Face API's `license` field for each
-repository. If you change a dependency version, re-read rather than assume:
-`ATTRIBUTIONS.md` is only as true as its last check.
+The Swift package licences and copyright lines were read from the licence
+files in the resolved checkouts of the versions pinned in `Package.resolved` —
+not from memory or from the packages' READMEs. The model licences were read
+from the Hugging Face API's `license` field for each repository.
+
+Two traps worth knowing, because this file fell into both on the first pass:
+
+- **The file is not always called `LICENSE`.** Zipcode's is `UNLICENSE`, which a
+  search for `LICENSE*` misses entirely — and a missing licence file reads as
+  "no licence" when it actually means the opposite, a public domain dedication.
+- **A package's own licence is not the whole story.** WhisperKit and FluidAudio
+  both vendor other people's code and declare it in a separate `NOTICES` or
+  `ThirdPartyLicenses` file, which is where the table above comes from.
+
+If you change a dependency version, re-read rather than assume: this file is
+only as true as its last check.
