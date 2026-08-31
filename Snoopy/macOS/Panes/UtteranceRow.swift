@@ -49,10 +49,7 @@ struct UtteranceRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(speakerName)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(color)
+                    speakerControl
                     if utterance.isEdited {
                         Image(systemName: "pencil")
                             .font(.caption2)
@@ -71,6 +68,46 @@ struct UtteranceRow: View {
         .padding(.vertical, 5)
         .contentShape(Rectangle())
         .contextMenu { menu }
+    }
+
+    // MARK: - Speaker
+
+    /// The speaker's name, and — when there is anyone to swap it for — a menu
+    /// for putting this line on someone else.
+    ///
+    /// The diarizer misattributes a line here and there, so the fix belongs on
+    /// the thing that is wrong rather than behind a right-click on the row.
+    @ViewBuilder private var speakerControl: some View {
+        if otherSpeakers.isEmpty {
+            nameLabel
+        } else {
+            Menu {
+                reassignMenu
+            } label: {
+                nameLabel
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Reassign this line to another speaker")
+        }
+    }
+
+    /// Offered from both the name and the row's context menu, so it is written
+    /// once.
+    @ViewBuilder private var reassignMenu: some View {
+        Menu("Reassign to") {
+            ForEach(otherSpeakers) { speaker in
+                Button(speaker.name) { onReassign(speaker.id) }
+            }
+        }
+    }
+
+    private var nameLabel: some View {
+        Text(speakerName)
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(color)
     }
 
     // MARK: - Text
@@ -138,11 +175,7 @@ struct UtteranceRow: View {
         }
 
         if !otherSpeakers.isEmpty {
-            Menu("Reassign to") {
-                ForEach(otherSpeakers) { speaker in
-                    Button(speaker.name) { onReassign(speaker.id) }
-                }
-            }
+            reassignMenu
         }
 
         Divider()
