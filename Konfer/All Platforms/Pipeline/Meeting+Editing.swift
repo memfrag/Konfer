@@ -192,6 +192,26 @@ nonisolated extension Meeting {
         utterances[index].isEdited = true
     }
 
+    // MARK: - Recording
+
+    /// Points the meeting at a recording.
+    ///
+    /// Two meetings need this. One imported from another app never had a
+    /// recording to begin with — a transcript file carries none — and one
+    /// whose audio was moved or renamed has lost the path it was transcribed
+    /// from. Both are the same fix, and neither is worth spending an hour
+    /// re-transcribing to undo.
+    ///
+    /// The duration follows the recording when the caller could read one: an
+    /// imported transcript's last timestamp is where the talking stopped, not
+    /// where the recording did, and the scrubber has to span the latter.
+    mutating func attachAudio(at url: URL, duration: TimeInterval?) {
+        audioPath = url.path
+        if let duration, duration.isFinite, duration > 0 {
+            self.duration = duration
+        }
+    }
+
     // MARK: - Search and replace
 
     /// Replaces one search match, keeping the recording's word timings where

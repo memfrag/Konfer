@@ -2,7 +2,9 @@
 //  Copyright © 2026 Martin Johannesson. All rights reserved.
 //
 
+import AVFoundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A transcript: speaker-tagged, timestamped, editable, and playable.
 struct MeetingPane: View {
@@ -17,6 +19,7 @@ struct MeetingPane: View {
     @State private var exportFormat: TranscriptExporter.Format?
     @State private var exportDocument: TranscriptDocument?
     @State private var find = TranscriptFindController()
+    @State private var isChoosingAudio = false
 
     private var meeting: Meeting? { meetingStore.meeting(meetingID) }
 
@@ -54,6 +57,14 @@ struct MeetingPane: View {
         ) { _ in
             exportDocument = nil
         }
+        .fileImporter(
+            isPresented: $isChoosingAudio,
+            allowedContentTypes: [.audio, .movie],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            Task { await attachAudio(at: url) }
+        }
     }
 
     // MARK: - Content
@@ -88,6 +99,11 @@ struct MeetingPane: View {
 
     /// Shown where the player would be, because a missing recording is a
     /// playback problem: everything else on this screen still works.
+    ///
+    /// The button is the way out of it, for the two meetings that land here —
+    /// a transcript imported without a recording, and one whose file has since
+    /// moved. Both are a wrong path and nothing else, so neither is worth
+    /// re-transcribing an hour to repair.
     private var missingAudioNotice: some View {
         HStack(spacing: 8) {
             Image(systemName: "waveform.slash")
@@ -96,6 +112,8 @@ struct MeetingPane: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
+            Button("Choose Recording…") { isChoosingAudio = true }
+                .controlSize(.small)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -294,6 +312,24 @@ struct MeetingPane: View {
     private func loadAudio() {
         guard let meeting, meeting.audioExists else { return }
         player.load(meeting.audioURL)
+    }
+
+    /// Points the meeting at a recording, then plays and draws it.
+    ///
+    /// The duration is read here rather than in the model because only this
+    /// side can await it, and `AVURLAsset` rather than ``AudioSourcePreparer``
+    /// because nothing is being transcribed: a video's audio track doesn't
+    /// need extracting to a temporary file for `AVPlayer` to play it.
+    private func attachAudio(at url: URL) async {
+        let duration = try? await AVURLAsset(url: url).load(.duration).seconds
+
+        meetingStore.modify(meetingID) { $0.attachAudio(at: url, duration: duration) }
+
+        // The envelope is cached under the meeting's id, so a meeting being
+        // pointed at a different file has to lose the one it had.
+        WaveformStore.removeCache(for: meetingID)
+        loadAudio()
+        await loadWaveform()
     }
 
     // MARK: - Editing

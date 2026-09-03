@@ -19,7 +19,7 @@ struct EmptyPane: View {
                 VStack(spacing: 4) {
                     Text("No recording selected")
                         .font(.title3)
-                    Text("Drop an audio or video recording here to transcribe it.")
+                    Text("Drop a recording here to transcribe it, or a transcript to import it.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
