@@ -76,6 +76,18 @@ one cut by CI. It refuses up front — before archiving anything — if the
 notarytool profile, `gh` auth or the Sparkle key is missing, or if the tag
 already exists; each of those otherwise surfaces at the end, after the build.
 
+The Sparkle key is checked by value, not merely for existence, and lives under
+its own keychain account (`--account konfer`) because the default `ed25519`
+account holds an older key belonging to something else. A key that isn't the
+one in `SUPublicEDKey` signs updates that every installed copy refuses, and
+`generate_appcast` only warns about that before writing the entry unsigned —
+which is how 1.1.0 was published un-updatable and had to be re-signed by hand.
+To set the key up on a new machine:
+
+```sh
+./Sparkle-tools/bin/generate_keys --account konfer -f <private-key-file>
+```
+
 The version lives in the build settings, not in `Info.plist`: the target sets
 `GENERATE_INFOPLIST_FILE = YES`, so `CFBundleShortVersionString` and
 `CFBundleVersion` are generated from `MARKETING_VERSION` and

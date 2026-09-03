@@ -8,7 +8,9 @@ set -euo pipefail
 # Prerequisites:
 #   - xcrun notarytool store-credentials 'notary' (one-time setup)
 #   - gh auth login
-#   - Sparkle EdDSA keys in keychain (run: ./Sparkle-tools/bin/generate_keys)
+#   - Sparkle EdDSA keys in keychain under the account named below, matching
+#     SUPublicEDKey in the app's Info.plist
+#     (run: ./Sparkle-tools/bin/generate_keys --account konfer)
 #
 # Usage:
 #   ./scripts/build-and-notarize.sh [--version 1.2.0] [--title "Konfer 1.2.0"]
@@ -23,6 +25,11 @@ SCHEME="Konfer (Release)"
 APP_NAME="Konfer"
 KEYCHAIN_PROFILE="notary"
 SPARKLE_VERSION="2.9.1"
+# Konfer's Sparkle key lives under its own keychain account rather than the
+# default `ed25519` one, which on this Mac holds an older key belonging to
+# something else. Signing under that one produces updates no installed copy of
+# Konfer can verify.
+SPARKLE_ACCOUNT="konfer"
 GITHUB_REPO="memfrag/Konfer"
 
 # --- Paths ---
@@ -34,11 +41,21 @@ ARCHIVE_PATH="$BUILD_DIR/$APP_NAME.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
 EXPORT_OPTIONS="$SCRIPT_DIR/ExportOptions.plist"
 PBXPROJ="$PROJECT_DIR/$APP_NAME.xcodeproj/project.pbxproj"
+INFO_PLIST="$PROJECT_DIR/$APP_NAME/macOS/Info.plist"
 
 # --- Helpers ---
 error() {
     echo "ERROR: $1" >&2
     exit 1
+}
+
+# An ed25519 public key is 32 bytes: exactly 44 base64 characters ending in '='.
+# Worth checking rather than trusting a non-empty string, because both tools
+# that hand one back here — PlistBuddy and generate_keys — report failure on
+# *stdout*, so a missing key otherwise arrives as an error message that passes
+# for one.
+is_ed_key() {
+    [[ "$1" =~ ^[A-Za-z0-9+/]{43}=$ ]]
 }
 
 usage() {
@@ -71,6 +88,23 @@ done
 # Whether there is anyone to ask.
 if [ -t 0 ]; then INTERACTIVE=true; else INTERACTIVE=false; fi
 
+# --- Download Sparkle tools if needed ---
+# Ahead of the preflight rather than after it, because the key check below is
+# one of the things the preflight is for and generate_keys lives in here.
+if [ ! -x "$SPARKLE_TOOLS_DIR/bin/sign_update" ]; then
+    echo "==> Downloading Sparkle tools $SPARKLE_VERSION..."
+    TOOLS_TMP="$(mktemp -d)"
+    trap 'rm -rf "$TOOLS_TMP"' EXIT
+    curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz" -o "$TOOLS_TMP/Sparkle.tar.xz" \
+        || error "Failed to download Sparkle tools $SPARKLE_VERSION."
+    mkdir -p "$SPARKLE_TOOLS_DIR"
+    tar -xf "$TOOLS_TMP/Sparkle.tar.xz" -C "$SPARKLE_TOOLS_DIR" \
+        || error "Failed to unpack Sparkle tools."
+    rm -rf "$TOOLS_TMP"
+    trap - EXIT
+    echo "    Sparkle tools installed at $SPARKLE_TOOLS_DIR"
+fi
+
 # --- Preflight ---
 # Everything the run needs but would not miss until the end. Notarization is
 # forty minutes of archiving away from the start, and finding out there is no
@@ -84,25 +118,36 @@ xcrun notarytool history --keychain-profile "$KEYCHAIN_PROFILE" >/dev/null 2>&1 
 gh auth status >/dev/null 2>&1 \
     || error "gh is not authenticated. Run: gh auth login"
 
-security find-generic-password -s "https://sparkle-project.org" >/dev/null 2>&1 \
-    || error "No Sparkle EdDSA key in the keychain. Run: ./Sparkle-tools/bin/generate_keys"
+# Not merely "a key exists": the key has to be the one the app trusts. An
+# update signed with any other is refused by every copy already installed, and
+# generate_appcast says so in a warning and then writes the entry unsigned
+# anyway — which is how 1.1.0 shipped un-updatable.
+[ -f "$INFO_PLIST" ] || error "No Info.plist at $INFO_PLIST."
+
+APP_ED_KEY=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$INFO_PLIST" 2>/dev/null || true)
+is_ed_key "$APP_ED_KEY" \
+    || error "No usable SUPublicEDKey in $INFO_PLIST (read: ${APP_ED_KEY:-nothing})."
+
+KEYCHAIN_ED_KEY=$("$SPARKLE_TOOLS_DIR/bin/generate_keys" --account "$SPARKLE_ACCOUNT" -p 2>/dev/null) \
+    || KEYCHAIN_ED_KEY=""
+is_ed_key "$KEYCHAIN_ED_KEY" \
+    || error "No Sparkle EdDSA key in the keychain under account '$SPARKLE_ACCOUNT'. Run:
+    ./Sparkle-tools/bin/generate_keys --account $SPARKLE_ACCOUNT -f <private-key-file>"
+
+[ "$KEYCHAIN_ED_KEY" = "$APP_ED_KEY" ] || error "The Sparkle key under account '$SPARKLE_ACCOUNT' is not the one the app trusts.
+    Keychain: $KEYCHAIN_ED_KEY
+    App:      $APP_ED_KEY
+    Updates signed with it would be refused by every installed copy. Import the
+    matching key with:
+    ./Sparkle-tools/bin/generate_keys --account $SPARKLE_ACCOUNT -f <private-key-file>"
 
 echo "    Notarization, GitHub and Sparkle signing are all set up."
+echo "    Sparkle key matches the app's SUPublicEDKey."
 
 # --- Clean and create build directory ---
 echo "==> Cleaning build directory..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
-
-# --- Download Sparkle tools if needed ---
-if [ ! -x "$SPARKLE_TOOLS_DIR/bin/sign_update" ]; then
-    echo "==> Downloading Sparkle tools $SPARKLE_VERSION..."
-    curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz" -o "$BUILD_DIR/Sparkle.tar.xz"
-    mkdir -p "$SPARKLE_TOOLS_DIR"
-    tar -xf "$BUILD_DIR/Sparkle.tar.xz" -C "$SPARKLE_TOOLS_DIR"
-    rm "$BUILD_DIR/Sparkle.tar.xz"
-    echo "    Sparkle tools installed at $SPARKLE_TOOLS_DIR"
-fi
 
 # --- Version checking ---
 echo "==> Checking version..."
@@ -231,7 +276,8 @@ echo "    Stapled."
 # generate_appcast signs the entry itself further down; this call is here to
 # fail on missing EdDSA keys before a GitHub release has been published.
 echo "==> Checking Sparkle signing key..."
-"$SPARKLE_TOOLS_DIR/bin/sign_update" "$DMG_PATH" || error "Sparkle signing failed."
+"$SPARKLE_TOOLS_DIR/bin/sign_update" --account "$SPARKLE_ACCOUNT" "$DMG_PATH" \
+    || error "Sparkle signing failed."
 
 # --- Release title ---
 if [ -n "$TITLE_ARG" ]; then
@@ -264,9 +310,16 @@ fi
 cp "$DMG_PATH" "$APPCAST_DIR/"
 
 "$SPARKLE_TOOLS_DIR/bin/generate_appcast" \
+    --account "$SPARKLE_ACCOUNT" \
     --download-url-prefix "https://github.com/$GITHUB_REPO/releases/download/$TAG/" \
     -o "$APPCAST_DIR/appcast.xml" \
     "$APPCAST_DIR" || error "Failed to generate appcast."
+
+# An unsigned entry is one Sparkle refuses, and generate_appcast writes one on
+# a bad key rather than failing. The preflight should have caught that; this
+# refuses to commit the result if anything else ever produces it.
+grep "releases/download/$TAG/" "$APPCAST_DIR/appcast.xml" | grep -q "sparkle:edSignature" \
+    || error "The generated appcast entry for $TAG carries no EdDSA signature. Sparkle would refuse this update."
 
 cp "$APPCAST_DIR/appcast.xml" "$PROJECT_DIR/appcast.xml"
 cd "$PROJECT_DIR"
