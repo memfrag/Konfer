@@ -24,6 +24,12 @@ struct Sidebar: View {
     /// A transcript file that turned out not to be one.
     @State private var importError: TranscriptImportError?
 
+    /// The meeting whose row is currently a text field, and what has been
+    /// typed into it.
+    @State private var renaming: UUID?
+    @State private var renameDraft = ""
+    @FocusState private var isRenameFieldFocused: Bool
+
     var body: some View {
         NavigationSplitView {
             sidebarList
@@ -98,19 +104,28 @@ struct Sidebar: View {
             // the first meeting has somewhere to live.
             Section {
                 ForEach(filteredMeetings) { meeting in
-                    NavigationLink(value: SidebarSelection.meeting(meeting.id)) {
-                        MeetingRow(meeting: meeting)
-                    }
-                    .contextMenu {
-                        Button("Reveal Audio in Finder") {
-                            NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
+                    // The whole row swaps to the field rather than growing one
+                    // inside the link: a text field inside a `NavigationLink`
+                    // spends its clicks on the link instead of on the text.
+                    if renaming == meeting.id {
+                        renameField
+                    } else {
+                        NavigationLink(value: SidebarSelection.meeting(meeting.id)) {
+                            MeetingRow(meeting: meeting)
                         }
-                        .disabled(!meeting.audioExists)
+                        .contextMenu {
+                            Button("Rename") { beginRename(meeting) }
 
-                        Divider()
+                            Button("Reveal Audio in Finder") {
+                                NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
+                            }
+                            .disabled(!meeting.audioExists)
 
-                        Button("Delete", role: .destructive) {
-                            meetingStore.delete(meeting.id)
+                            Divider()
+
+                            Button("Delete", role: .destructive) {
+                                meetingStore.delete(meeting.id)
+                            }
                         }
                     }
                 }
@@ -167,6 +182,47 @@ struct Sidebar: View {
                 || meeting.speakers.contains { $0.name.localizedCaseInsensitiveContains(query) }
                 || meeting.utterances.contains { $0.text.localizedCaseInsensitiveContains(query) }
         }
+    }
+
+    // MARK: - Renaming
+
+    /// The row a meeting is renamed in.
+    ///
+    /// Return commits and Escape abandons, and so does clicking away — the
+    /// Finder's terms, because this looks exactly like renaming a file there
+    /// and anything else would be a surprise. Committing an empty name is left
+    /// to ``Meeting/rename(to:)``, which refuses it and leaves the old title
+    /// standing.
+    private var renameField: some View {
+        TextField("Name", text: $renameDraft)
+            .textFieldStyle(.roundedBorder)
+            .focused($isRenameFieldFocused)
+            .onSubmit { commitRename() }
+            .onExitCommand { renaming = nil }
+            .onAppear {
+                // A turn later, not in this one: a field focused before it has
+                // joined the responder chain is focused and then immediately
+                // isn't, and the row sits there refusing to take a keystroke.
+                Task { isRenameFieldFocused = true }
+            }
+            .onChange(of: isRenameFieldFocused) { _, isFocused in
+                // Reached by clicking away. Return and Escape have both
+                // already cleared `renaming`, so the commit below is a no-op
+                // for them rather than a second one.
+                if !isFocused { commitRename() }
+            }
+            .padding(.vertical, 2)
+    }
+
+    private func beginRename(_ meeting: Meeting) {
+        renameDraft = meeting.title
+        renaming = meeting.id
+    }
+
+    private func commitRename() {
+        guard let id = renaming else { return }
+        renaming = nil
+        meetingStore.modify(id) { $0.rename(to: renameDraft) }
     }
 
     // MARK: - Detail

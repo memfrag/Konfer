@@ -52,6 +52,22 @@ struct MeetingEditingTests {
 
     // MARK: - Renaming
 
+    @Test("A meeting takes the name it is given, trimmed")
+    func renamesMeeting() {
+        var meeting = makeMeeting()
+        meeting.rename(to: "  Kickoff  ")
+
+        #expect(meeting.title == "Kickoff")
+    }
+
+    @Test("A meeting can't be renamed to nothing")
+    func refusesEmptyMeetingName() {
+        var meeting = makeMeeting()
+        meeting.rename(to: "   ")
+
+        #expect(meeting.title == "Standup")
+    }
+
     @Test("Renaming a speaker relabels every one of their lines at once")
     func renameAppliesEverywhere() {
         var meeting = makeMeeting()

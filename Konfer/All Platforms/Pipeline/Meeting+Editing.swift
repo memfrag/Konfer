@@ -19,6 +19,21 @@ nonisolated enum MergeDirection {
 
 nonisolated extension Meeting {
 
+    // MARK: - The meeting
+
+    /// Renames the meeting.
+    ///
+    /// A title starts life as a filename, which is what the recorder or the
+    /// exporting app happened to call it and rarely what the meeting was. It
+    /// is also the only thing telling two rows in the sidebar apart, so an
+    /// empty name is refused rather than stored: a blank row is worse than a
+    /// clumsy one, and there would be nothing left to click to fix it.
+    mutating func rename(to newTitle: String) {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        title = trimmed
+    }
+
     // MARK: - Speakers
 
     mutating func renameSpeaker(_ speakerId: String, to name: String) {
