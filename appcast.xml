@@ -9,7 +9,7 @@
             <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/memfrag/Konfer/releases/download/1.1.0/Konfer-1.1.0.dmg" length="14429197" type="application/octet-stream"/>
+            <enclosure url="https://github.com/memfrag/Konfer/releases/download/1.1.0/Konfer-1.1.0.dmg" length="14429197" type="application/octet-stream" sparkle:edSignature="G50W6phM2bOO5jRqo4hkQsAdKRZmxEfz8nHEICaeDyaRhgCHP5WGssfrdGnjQIv5KihnP5tdhf4cKTwdr68nDQ=="/>
         </item>
         <item>
             <title>1.0.0</title>
