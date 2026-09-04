@@ -110,4 +110,23 @@ nonisolated enum RecordingError: LocalizedError {
             nil
         }
     }
+
+    /// Where in System Settings this can be granted, for the two errors that
+    /// are a withheld permission rather than a failure.
+    ///
+    /// Worth offering as a button rather than only naming the pane in prose.
+    /// macOS asks for a permission exactly once: a refusal is never
+    /// reconsidered, `prepare` will not prompt again, and the app is left
+    /// sitting in a Settings pane the user now has to find on their own. This
+    /// banner is the only thing still pointing at it.
+    var privacySettingsURL: URL? {
+        let pane: String? = switch self {
+        case .microphoneAccessDenied: "Privacy_Microphone"
+        case .screenRecordingAccessDenied: "Privacy_ScreenCapture"
+        default: nil
+        }
+        return pane.flatMap {
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?\($0)")
+        }
+    }
 }

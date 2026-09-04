@@ -2,6 +2,7 @@
 //  Copyright © 2026 Martin Johannesson. All rights reserved.
 //
 
+import AppKit
 import SwiftUI
 
 /// Set up a recording, watch it happen, stop it.
@@ -217,6 +218,15 @@ struct RecorderView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                // Naming the pane isn't much help once the prompt is spent —
+                // see `privacySettingsURL`.
+                if let settings = error.privacySettingsURL {
+                    Button("Open Privacy Settings…") {
+                        NSWorkspace.shared.open(settings)
+                    }
+                    .controlSize(.small)
+                    .padding(.top, 4)
                 }
             }
             Spacer()
