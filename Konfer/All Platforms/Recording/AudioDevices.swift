@@ -38,7 +38,14 @@ nonisolated enum AudioInputDevices {
 ///
 /// Core Audio keeps its own list of processes with audio, separate from the
 /// list of running applications — an app only appears here once it actually has
-/// an output stream, which is the same condition a tap needs.
+/// an output stream.
+///
+/// That is a stricter condition than a tap needs: `prepare` only requires a
+/// process object, which a process keeps after it falls silent. The list is
+/// narrowed to what is *playing* because the alternative is unusable — every
+/// process that has ever touched audio, `loginwindow` and `PowerChime`
+/// included. ``AudioApplicationsMonitor`` carries the cost of that choice: the
+/// playing/not-playing property is not one Core Audio notifies on.
 nonisolated enum AudioApplications {
 
     static func playingAudio() -> [AudioApplication] {

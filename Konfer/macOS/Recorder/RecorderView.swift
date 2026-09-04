@@ -26,9 +26,10 @@ struct RecorderView: View {
         }
         .frame(width: 460)
         .task {
-            controller.refreshDevices()
+            controller.startWatchingDevices()
             controller.destinationFolder = Self.storedFolder(appSettings.recordingFolder)
         }
+        .onDisappear { controller.stopWatchingDevices() }
         .fileImporter(
             isPresented: $isChoosingFolder,
             allowedContentTypes: [.folder]

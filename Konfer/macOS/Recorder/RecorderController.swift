@@ -56,6 +56,7 @@ final class RecorderController {
 
     // MARK: - Private
 
+    @ObservationIgnored private let applicationsMonitor = AudioApplicationsMonitor()
     @ObservationIgnored private var source: (any RecordingSource)?
     @ObservationIgnored private var writer: TwoChannelWriter?
     @ObservationIgnored private var meterTask: Task<Void, Never>?
@@ -68,14 +69,55 @@ final class RecorderController {
 
     // MARK: - Devices
 
+    /// Keeps the lists in step with the machine for as long as the window is open.
+    ///
+    /// Changes are ignored while recording: the lists exist to choose a source,
+    /// and re-deriving them mid-recording could move the selection out from
+    /// under a tap that is already running.
+    func startWatchingDevices() {
+        refreshDevices()
+        applicationsMonitor.start { [weak self] in
+            guard let self, state == .idle else { return }
+            refreshDevices()
+        }
+    }
+
+    func stopWatchingDevices() {
+        applicationsMonitor.stop()
+    }
+
     func refreshDevices() {
-        microphones = AudioInputDevices.available()
-        applications = AudioApplications.playingAudio()
+        let attached = AudioInputDevices.available()
+        if microphones != attached { microphones = attached }
+
+        var playing = AudioApplications.playingAudio()
+
+        // A call that goes quiet for a moment drops out of "playing audio", but
+        // it is still there and still tappable: a tap targets the process
+        // object, which outlives the silence. Keeping the chosen app in the
+        // list is what lets the picker go on showing it — a selection with no
+        // matching tag renders blank — and stops the fallback below from
+        // firing on a pause between sentences.
+        if case .app(let chosen) = systemAudio,
+           !playing.contains(where: { $0.id == chosen.id }),
+           AudioApplications.processObjectID(for: chosen.id) != nil {
+            playing.append(chosen)
+            playing.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        }
+
+        // Assigned only when it actually differs: observation has no equality
+        // check of its own, so publishing the same list every two seconds
+        // would redraw the window for nothing.
+        if applications != playing { applications = playing }
 
         if microphoneID == nil || !microphones.contains(where: { $0.id == microphoneID }) {
             microphoneID = microphones.first?.id
         }
-        // An app that stopped playing can't be tapped any more.
+        // Only once the process itself is gone — quitting the app being
+        // recorded is the one case where the choice genuinely cannot stand.
+        // Falling back on silence alone would move the recording to
+        // "everything the Mac plays", which needs a screen-recording prompt
+        // the user never asked for.
         if case .app(let chosen) = systemAudio,
            !applications.contains(where: { $0.id == chosen.id }) {
             systemAudio = applications.isEmpty ? .none : .everything
