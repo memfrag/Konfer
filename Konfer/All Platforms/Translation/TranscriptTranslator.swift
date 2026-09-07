@@ -129,23 +129,42 @@ actor TranscriptTranslator {
 
     // MARK: - Translating
 
-    /// Translates the given turns, in order.
+    /// How many finished lines are handed back at a time.
+    ///
+    /// Small enough that cancelling an hour-long meeting keeps almost all of
+    /// what it had already done, large enough that the library file is not
+    /// rewritten once per turn. `KONFER_TRANSLATE_CHUNK` overrides it for
+    /// measuring that trade.
+    static let chunkSize: Int = ProcessInfo.processInfo
+        .environment["KONFER_TRANSLATE_CHUNK"].flatMap(Int.init).map { max($0, 1) } ?? 25
+
+    /// Translates the given turns, in order, handing lines back as they arrive.
     ///
     /// Turns are sent whole rather than sentence by sentence: a turn is the
     /// unit the transcript is made of, the unit an edit invalidates, and enough
     /// context for the model to get pronouns and word order right.
     ///
-    /// - Returns: One line per turn that came back, keyed by the turn's id. A
-    ///   turn whose translation is empty is left out rather than stored blank.
+    /// Delivered in chunks rather than all at the end so that cancelling keeps
+    /// what was done. Half a translation is genuinely half a translation — the
+    /// pane shows the original for every turn that has none — which is not
+    /// true of, say, half a video, and is why this differs from
+    /// ``VideoExportQueue``.
+    ///
+    /// A turn whose translation comes back empty is left out rather than
+    /// stored blank, so it reads as "not translated" and can be retried.
     func translate(
         _ utterances: [Utterance],
         from source: MeetingLanguage,
         to target: MeetingLanguage,
-        progress: @escaping @Sendable (Double) -> Void
-    ) async throws -> [TranslatedLine] {
+        onLines: @escaping @Sendable ([TranslatedLine]) -> Void
+    ) async throws {
 
         guard source != target else { throw TranscriptTranslationError.sameLanguage }
-        guard !utterances.isEmpty else { return [] }
+        guard !utterances.isEmpty else { return }
+
+        if TranslationSupport.isKnownUnavailable(from: source, to: target) {
+            throw TranscriptTranslationError.pairUnavailable(from: source, to: target)
+        }
 
         switch await Self.availability(from: source, to: target) {
         case .ready:
@@ -172,30 +191,36 @@ actor TranscriptTranslator {
             TranslationSession.Request(sourceText: $0.text, clientIdentifier: $0.id.uuidString)
         }
 
-        var lines: [TranslatedLine] = []
-        lines.reserveCapacity(requests.count)
-        let total = Double(requests.count)
+        var pending: [TranslatedLine] = []
 
         do {
             for try await response in session.translate(batch: requests) {
-                // Checked per response rather than per batch: at a third of a
+                // Checked per response rather than per chunk: at a third of a
                 // second a turn, that is how long Cancel takes to bite.
                 if Task.isCancelled {
                     session.cancel()
+                    if !pending.isEmpty { onLines(pending) }
                     throw TranscriptTranslationError.cancelled
                 }
 
                 if let identifier = response.clientIdentifier,
                    let utteranceID = byIdentifier[identifier],
                    !response.targetText.isEmpty {
-                    lines.append(TranslatedLine(utteranceID: utteranceID, text: response.targetText))
+                    pending.append(TranslatedLine(utteranceID: utteranceID, text: response.targetText))
                 }
 
-                progress(Double(lines.count) / total)
+                if pending.count >= Self.chunkSize {
+                    onLines(pending)
+                    pending = []
+                }
             }
         } catch let error as TranscriptTranslationError {
             throw error
         } catch {
+            // Whatever arrived before the failure is still good, and keeping it
+            // turns a failed run into a shorter one rather than a wasted one.
+            if !pending.isEmpty { onLines(pending) }
+
             if TranslationError.notInstalled ~= error {
                 throw TranscriptTranslationError.notInstalled(from: source, to: target)
             }
@@ -205,7 +230,6 @@ actor TranscriptTranslator {
             throw TranscriptTranslationError.failed(underlying: error)
         }
 
-        progress(1)
-        return lines
+        if !pending.isEmpty { onLines(pending) }
     }
 }

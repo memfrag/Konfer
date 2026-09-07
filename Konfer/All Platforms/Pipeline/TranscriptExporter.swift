@@ -38,18 +38,30 @@ nonisolated enum TranscriptExporter {
             case .subRip: "srt"
             }
         }
+
+        /// Whether exporting this format in the translation language produces
+        /// a different file.
+        ///
+        /// JSON does not: it carries both texts already, so a second file
+        /// would be the same bytes under a longer name.
+        var hasTranslatedVariant: Bool { self != .json }
     }
 
-    static func data(for meeting: Meeting, format: Format) throws -> Data {
+    static func data(
+        for meeting: Meeting,
+        format: Format,
+        rendering: TranscriptRendering = .original
+    ) throws -> Data {
         switch format {
         case .markdown:
-            Data(markdown(for: meeting).utf8)
+            Data(markdown(for: meeting, rendering: rendering).utf8)
         case .json:
+            // Always both languages, whatever was asked for.
             try json(for: meeting)
         case .webVTT:
-            Data(SubtitleExporter.webVTT(for: meeting).utf8)
+            Data(SubtitleExporter.webVTT(for: meeting, rendering: rendering).utf8)
         case .subRip:
-            Data(SubtitleExporter.srt(for: meeting).utf8)
+            Data(SubtitleExporter.srt(for: meeting, rendering: rendering).utf8)
         }
     }
 
@@ -64,13 +76,23 @@ nonisolated enum TranscriptExporter {
     }
 
     /// A whole turn as plain text, for the clipboard.
-    static func plainLine(for utterance: Utterance, speaker: String) -> String {
-        "\(attribution(for: utterance, speaker: speaker)) \(utterance.text)"
+    ///
+    /// - Parameter text: What to put after the attribution, when that is not
+    ///   the turn's own text — the pane copies the language it is showing.
+    static func plainLine(
+        for utterance: Utterance,
+        speaker: String,
+        text: String? = nil
+    ) -> String {
+        "\(attribution(for: utterance, speaker: speaker)) \(text ?? utterance.text)"
     }
 
     // MARK: - Markdown
 
-    static func markdown(for meeting: Meeting) -> String {
+    static func markdown(
+        for meeting: Meeting,
+        rendering: TranscriptRendering = .original
+    ) -> String {
         var lines: [String] = []
 
         lines.append("# \(meeting.title)")
@@ -94,12 +116,38 @@ nonisolated enum TranscriptExporter {
                 + "recording, so every line is attributed to a single unknown speaker."
             )
         }
+
+        // Said in the file itself, not only in the filename, because a
+        // Markdown transcript is read far from wherever it was saved and a
+        // machine translation should never be mistaken for a record of what
+        // was said.
+        if rendering == .translated, let target = meeting.translationTarget {
+            lines.append("")
+            lines.append(
+                "*Translated from \(meeting.language.displayName) to "
+                + "\(target.displayName) on device. The recording is in "
+                + "\(meeting.language.displayName).*"
+            )
+
+            let untranslated = meeting.keptUtterances.filter {
+                meeting.translatedText(for: $0) == nil
+            }
+            if !untranslated.isEmpty {
+                let one = untranslated.count == 1
+                lines.append("")
+                lines.append(
+                    "*\(untranslated.count) \(one ? "line has" : "lines have") no "
+                    + "translation and \(one ? "is" : "are") shown in "
+                    + "\(meeting.language.displayName).*"
+                )
+            }
+        }
         lines.append("")
 
         for utterance in meeting.keptUtterances {
             let name = meeting.displayName(for: utterance.speakerId)
             let attribution = Self.attribution(for: utterance, speaker: name)
-            lines.append("**\(attribution)** \(utterance.text)")
+            lines.append("**\(attribution)** \(meeting.text(for: utterance, rendering: rendering))")
             lines.append("")
         }
 
@@ -147,6 +195,18 @@ private nonisolated struct ExportedMeeting: Encodable {
         let text: String
         let isEdited: Bool
         let words: [Word]?
+
+        /// The turn in the translation language, alongside `text` and never
+        /// instead of it. `words` times the words in `text`; swapping the text
+        /// underneath them would leave them timing something nobody said.
+        /// Absent for a turn that has no translation.
+        let translatedText: String?
+    }
+
+    struct Translation: Encodable {
+        let from: String
+        let to: String
+        let translatedAt: Date
     }
 
     struct Kept: Encodable {
@@ -165,6 +225,10 @@ private nonisolated struct ExportedMeeting: Encodable {
     /// but one that reports timestamps can say what the file covers.
     let trimmedTo: Kept?
 
+    /// Present only when the meeting has been translated, so a consumer
+    /// written before translation existed reads exactly what it read before.
+    let translation: Translation?
+
     let speakers: [Speaker]
     let transcript: [Turn]
 
@@ -175,6 +239,13 @@ private nonisolated struct ExportedMeeting: Encodable {
         language = meeting.language.rawValue
         degraded = meeting.degraded?.rawValue
         trimmedTo = meeting.keptRange.map { Kept(start: $0.start, end: $0.end) }
+        translation = meeting.translation.map {
+            Translation(
+                from: meeting.language.rawValue,
+                to: $0.target.rawValue,
+                translatedAt: $0.translatedAt
+            )
+        }
         speakers = meeting.speakers.map {
             Speaker(id: $0.id, name: $0.name, totalDuration: $0.totalDuration)
         }
@@ -188,7 +259,8 @@ private nonisolated struct ExportedMeeting: Encodable {
                 isEdited: utterance.isEdited,
                 words: utterance.words?.map {
                     Turn.Word(word: $0.word, start: $0.start, end: $0.end)
-                }
+                },
+                translatedText: meeting.translatedText(for: utterance)
             )
         }
     }
