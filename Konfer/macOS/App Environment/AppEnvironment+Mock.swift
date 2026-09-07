@@ -34,7 +34,8 @@ extension AppEnvironment {
                 meetingStore: meetingStore,
                 speakerStore: speakerStore
             ),
-            downloads: ModelDownloadQueue()
+            downloads: ModelDownloadQueue(),
+            videoExports: VideoExportQueue()
         )
     }
     #endif

@@ -42,6 +42,10 @@ public final class AppEnvironment {
     /// the first-run screen all drive the same queue.
     internal let downloads: ModelDownloadQueue
 
+    /// Writes subtitled copies of recordings. Shared, because an export has to
+    /// outlive the pane that started it.
+    internal let videoExports: VideoExportQueue
+
     // MARK: - Init
 
     /// Creates an environment with the provided dependencies.
@@ -54,7 +58,8 @@ public final class AppEnvironment {
         meetingStore: MeetingStore,
         speakerStore: SpeakerStore,
         pipeline: TranscriptionPipeline,
-        downloads: ModelDownloadQueue
+        downloads: ModelDownloadQueue,
+        videoExports: VideoExportQueue
     ) {
         self.appSettings = appSettings
         self.engineeringMode = engineeringMode
@@ -62,5 +67,6 @@ public final class AppEnvironment {
         self.speakerStore = speakerStore
         self.pipeline = pipeline
         self.downloads = downloads
+        self.videoExports = videoExports
     }
 }

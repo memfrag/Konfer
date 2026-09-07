@@ -23,6 +23,7 @@ extension View {
             .environment(appEnvironment.speakerStore)
             .environment(appEnvironment.pipeline)
             .environment(appEnvironment.downloads)
+            .environment(appEnvironment.videoExports)
     }
 
     #if DEBUG
@@ -35,6 +36,7 @@ extension View {
             .environment(appEnvironment.speakerStore)
             .environment(appEnvironment.pipeline)
             .environment(appEnvironment.downloads)
+            .environment(appEnvironment.videoExports)
     }
     #endif
 }
