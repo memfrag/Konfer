@@ -254,6 +254,59 @@ nonisolated enum DegradedStage: String, Codable, Sendable {
     case diarization
 }
 
+// MARK: - Translation
+
+/// One turn's text in the meeting's translation language.
+///
+/// Carries the turn's id rather than its index, because turns are split,
+/// merged and deleted after a translation exists and an index would quietly
+/// come to mean a different line.
+nonisolated struct TranslatedLine: Codable, Hashable, Sendable {
+    let utteranceID: UUID
+    var text: String
+}
+
+/// The transcript in a second language.
+///
+/// A translation is derived from the transcript, never a replacement for it:
+/// the pane shows one or the other, and every line it holds can be thrown away
+/// and made again from the turn it came from. That is why editing a turn
+/// simply drops its line — see ``Meeting/dropTranslations(for:)``.
+///
+/// Only one target language is kept. A second would multiply the file for a
+/// case nobody has — a meeting is read in one language at a time — and
+/// re-translating an hour costs about two minutes, measured, not two hours.
+///
+/// Stored as an array rather than a `[UUID: String]` because `JSONEncoder`
+/// writes a dictionary with non-string keys as a flat alternating list, which
+/// `.sortedKeys` cannot order and nobody can read in a file the app
+/// deliberately pretty-prints.
+nonisolated struct TranscriptTranslation: Codable, Hashable, Sendable {
+
+    let target: MeetingLanguage
+
+    /// One entry per translated turn. A turn with no entry has not been
+    /// translated yet, or lost its translation when its text was edited.
+    var lines: [TranslatedLine]
+
+    var translatedAt: Date
+
+    init(target: MeetingLanguage, lines: [TranslatedLine] = [], translatedAt: Date = Date()) {
+        self.target = target
+        self.lines = lines
+        self.translatedAt = translatedAt
+    }
+
+    /// The lines keyed for lookup. Built once by the pane, not once per row.
+    var byUtterance: [UUID: String] {
+        Dictionary(lines.map { ($0.utteranceID, $0.text) }, uniquingKeysWith: { _, last in last })
+    }
+
+    func text(for utteranceID: UUID) -> String? {
+        lines.first { $0.utteranceID == utteranceID }?.text
+    }
+}
+
 // MARK: - Meeting
 
 /// A transcribed recording, as persisted in the library.
@@ -294,6 +347,10 @@ nonisolated struct Meeting: Identifiable, Codable, Hashable, Sendable {
     /// which is known to drop speech. Optional so meetings written before the
     /// setting existed still decode.
     var wasFastTranscribed: Bool?
+
+    /// The transcript in another language, or nil if it was never translated.
+    /// Optional so meetings written before translation existed still decode.
+    var translation: TranscriptTranslation?
 
     var audioURL: URL { URL(fileURLWithPath: audioPath) }
 

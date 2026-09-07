@@ -96,6 +96,7 @@ nonisolated extension Meeting {
     /// voice embedding and the ability to attribute another line to them.
     mutating func removeUtterance(_ utteranceID: UUID) {
         utterances.removeAll { $0.id == utteranceID }
+        dropTranslations(for: [utteranceID])
     }
 
     /// Splits a turn in two at a word boundary, for a speaker change the
@@ -135,6 +136,11 @@ nonisolated extension Meeting {
 
         utterances[index] = first
         utterances.insert(second, at: index + 1)
+
+        // The first half keeps the original id, so its line would survive and
+        // now describe both halves. Neither half has a translation until the
+        // meeting is translated again.
+        dropTranslations(for: [original.id])
         return second.id
     }
 
@@ -203,6 +209,10 @@ nonisolated extension Meeting {
             isEdited: first.isEdited || second.isEdited
         )
         utterances.remove(at: firstIndex + 1)
+
+        // The survivor keeps the earlier turn's id, so its line would come to
+        // stand for text it only half covers.
+        dropTranslations(for: [first.id, second.id])
         return first.id
     }
 
@@ -220,6 +230,7 @@ nonisolated extension Meeting {
         utterances[index].text = trimmed
         utterances[index].words = nil
         utterances[index].isEdited = true
+        dropTranslations(for: [utteranceID])
     }
 
     // MARK: - Trimming
@@ -324,6 +335,10 @@ nonisolated extension Meeting {
 
             utterances[index].words = updated
             utterances[index].text = SpeakerAligner.joined(updated)
+
+            // The timings survived, but the words did not: a translation of
+            // the old text no longer describes this turn.
+            dropTranslations(for: [match.utteranceID])
             return .keepsTimings
         }
 
@@ -332,6 +347,7 @@ nonisolated extension Meeting {
         )
         utterances[index].words = nil
         utterances[index].isEdited = true
+        dropTranslations(for: [match.utteranceID])
         return .dropsTimings
     }
 
@@ -370,6 +386,30 @@ nonisolated extension Meeting {
         let start = text.index(text.startIndex, offsetBy: offset)
         let end = text.index(start, offsetBy: length)
         return text.replacingCharacters(in: start..<end, with: replacement)
+    }
+
+    // MARK: - Translation
+
+    /// Forgets the translation of the given turns.
+    ///
+    /// A translated line is derived from an utterance's text, so any edit that
+    /// rewrites that text — or folds two turns into one — leaves the line
+    /// standing for something that is no longer there. Dropping it is the same
+    /// bargain ``Utterance/words`` already makes, and a far cheaper one to
+    /// undo: translating again sends only the turns that have no line, about a
+    /// third of a second each, rather than the whole meeting's two minutes.
+    ///
+    /// Renaming, reassigning and merging speakers leave translations alone.
+    /// None of them touches a word that was said.
+    mutating func dropTranslations(for ids: [UUID]) {
+        guard translation != nil, !ids.isEmpty else { return }
+        let dropped = Set(ids)
+        translation?.lines.removeAll { dropped.contains($0.utteranceID) }
+    }
+
+    /// Forgets the translation entirely, for "Remove Translation".
+    mutating func removeTranslation() {
+        translation = nil
     }
 
     // MARK: - Helpers

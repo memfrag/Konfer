@@ -302,6 +302,17 @@ final class TranscriptionPipeline {
                 existing.sliceCuts = cuts.isEmpty ? nil : cuts
                 existing.wasFastTranscribed = job.fastTranscription ? true : nil
                 existing.duration = audio.sourceDuration
+
+                // The language the re-run was told to use, which may not be
+                // the one the first run used. Without this a meeting
+                // transcribed again in another language keeps the old label,
+                // and everything downstream that reads it — the routing
+                // table, the translate sheet's source — believes it.
+                existing.language = job.language
+
+                // Every turn above is a new `Utterance` with a new id, so a
+                // translation keyed by the old ones describes nothing at all.
+                existing.removeTranslation()
                 meetingStore.update(existing)
                 lastFinishedMeetingID = existing.id
             } else {
