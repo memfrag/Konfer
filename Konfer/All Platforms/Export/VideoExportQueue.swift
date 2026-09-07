@@ -48,15 +48,16 @@ final class VideoExportQueue {
 
     /// Injected so tests need not copy a gigabyte of video.
     @ObservationIgnored private let write: @Sendable (
-        Meeting, URL, Bool, @Sendable @escaping (Double) -> Void
+        Meeting, URL, Bool, TranscriptRendering, @Sendable @escaping (Double) -> Void
     ) async throws -> Void
 
     init(
         write: @escaping @Sendable (
-            Meeting, URL, Bool, @Sendable @escaping (Double) -> Void
-        ) async throws -> Void = { meeting, url, trimmed, progress in
+            Meeting, URL, Bool, TranscriptRendering, @Sendable @escaping (Double) -> Void
+        ) async throws -> Void = { meeting, url, trimmed, rendering, progress in
             try await SubtitledVideoWriter.write(
-                meeting: meeting, to: url, trimmed: trimmed, progress: progress
+                meeting: meeting, to: url, trimmed: trimmed,
+                rendering: rendering, progress: progress
             )
         }
     ) {
@@ -65,7 +66,12 @@ final class VideoExportQueue {
 
     // MARK: - Running
 
-    func export(_ meeting: Meeting, to destination: URL, trimmed: Bool) {
+    func export(
+        _ meeting: Meeting,
+        to destination: URL,
+        trimmed: Bool,
+        rendering: TranscriptRendering = .original
+    ) {
         guard !state.isExporting else { return }
 
         title = meeting.title
@@ -84,7 +90,7 @@ final class VideoExportQueue {
 
         task = Task { [weak self, write] in
             do {
-                try await write(meeting, destination, trimmed, onProgress)
+                try await write(meeting, destination, trimmed, rendering, onProgress)
                 await MainActor.run {
                     guard let self, self.state.isExporting else { return }
                     self.state = .finished(destination)

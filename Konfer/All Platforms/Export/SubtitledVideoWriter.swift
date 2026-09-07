@@ -91,11 +91,15 @@ nonisolated enum SubtitledVideoWriter {
     /// - Parameters:
     ///   - trimmed: Whether to cut the copy to the meeting's kept range. Cue
     ///     times are shifted with it, so the subtitles still land on the words.
+    ///   - rendering: Which language the subtitle track carries. A translated
+    ///     track is tagged with the language it is in, not the one the meeting
+    ///     was held in, so a player's Subtitles menu names it correctly.
     ///   - progress: Fraction complete, 0...1, called as the copy proceeds.
     static func write(
         meeting: Meeting,
         to destination: URL,
         trimmed: Bool,
+        rendering: TranscriptRendering = .original,
         progress: @Sendable @escaping (Double) -> Void
     ) async throws {
 
@@ -140,6 +144,7 @@ nonisolated enum SubtitledVideoWriter {
         try addSubtitles(
             to: movie,
             meeting: meeting,
+            rendering: rendering,
             offset: start,
             length: span,
             pictureSize: pictureSize
@@ -225,6 +230,7 @@ nonisolated enum SubtitledVideoWriter {
     private static func addSubtitles(
         to movie: AVMutableMovie,
         meeting: Meeting,
+        rendering: TranscriptRendering,
         offset: TimeInterval,
         length: TimeInterval,
         pictureSize: CGSize
@@ -236,10 +242,18 @@ nonisolated enum SubtitledVideoWriter {
             withMediaType: .subtitle, copySettingsFrom: nil, options: nil
         ) else { throw VideoExportError.trackCreationFailed }
 
+        // The language on the track is the language of the words on it, which
+        // for a translated copy is not the language of the meeting. A player's
+        // Subtitles menu reads these and would otherwise offer "Swedish" over
+        // a track of English.
+        let spoken = rendering == .translated
+            ? (meeting.translationTarget ?? meeting.language)
+            : meeting.language
+
         // Both, and before the header is written: `mdhd` carries the three
         // letter code and is what a player reads to label the track.
-        track.languageCode = iso639_2(for: meeting.language)
-        track.extendedLanguageTag = meeting.language.code
+        track.languageCode = iso639_2(for: spoken)
+        track.extendedLanguageTag = spoken.code
         // Its own alternate group, so the track is offered as a subtitle choice
         // rather than as an alternative to the picture or the sound.
         track.alternateGroupID = 3
@@ -247,7 +261,9 @@ nonisolated enum SubtitledVideoWriter {
 
         // The same cues SubRip gets, shifted onto the copy's clock. The name
         // takes room on the line here exactly as it does there.
-        let cues = SubtitleExporter.cues(for: meeting, attributionTakesRoom: true)
+        let cues = SubtitleExporter.cues(
+            for: meeting, attributionTakesRoom: true, rendering: rendering
+        )
             .map {
                 (start: $0.start - offset, end: $0.end - offset,
                  text: SubtitleExporter.displayText(for: $0))

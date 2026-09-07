@@ -16,14 +16,22 @@ struct MeetingPane: View {
     @Environment(SpeakerStore.self) private var speakerStore
     @Environment(TranscriptionPipeline.self) private var pipeline
     @Environment(VideoExportQueue.self) private var videoExports
+    @Environment(TranslationQueue.self) private var translations
 
     @State private var player = PlayerController()
     @State private var waveform: Waveform?
     @State private var exportFormat: TranscriptExporter.Format?
+    @State private var exportRendering: TranscriptRendering = .original
     @State private var exportDocument: TranscriptDocument?
     @State private var find = TranscriptFindController()
     @State private var isChoosingAudio = false
     @State private var isRetranscribing = false
+    @State private var isTranslating = false
+
+    /// Which language the transcript is being read in. Never persisted: a
+    /// meeting reopens in the language it was spoken in, because that is the
+    /// record and the translation is a reading of it.
+    @State private var rendering: TranscriptRendering = .original
 
     /// The range being dragged, while the trim handles are up. Held apart from
     /// the meeting so that abandoning a trim costs nothing and the transcript
@@ -67,7 +75,21 @@ struct MeetingPane: View {
         .onChange(of: meeting?.keptUtterances, initial: true) { _, utterances in
             find.update(with: utterances ?? [])
         }
-        .onChange(of: meetingID) { _, _ in find.dismiss() }
+        .onChange(of: meetingID) { _, _ in
+            find.dismiss()
+            rendering = .original
+        }
+        // A re-transcription drops the translation out from under the toggle.
+        .onChange(of: meeting?.translationTarget) { _, target in
+            if target == nil { rendering = .original }
+        }
+        // Find works on `Utterance.text`, and `TranscriptMatch` carries
+        // character offsets into it that replace writes back at. Offsets taken
+        // from a translation would rewrite the wrong string in the wrong
+        // place, so the two are kept apart rather than made to cooperate.
+        .onChange(of: rendering) { _, rendering in
+            if rendering == .translated { find.dismiss() }
+        }
         .fileExporter(
             isPresented: Binding(
                 get: { exportDocument != nil },
@@ -78,6 +100,14 @@ struct MeetingPane: View {
             defaultFilename: exportFilename
         ) { _ in
             exportDocument = nil
+        }
+        .sheet(isPresented: $isTranslating) {
+            if let meeting {
+                TranslateSheet(meeting: meeting) { target in
+                    translations.translate(meeting, into: target)
+                    rendering = .translated
+                }
+            }
         }
         .sheet(isPresented: $isRetranscribing) {
             if let meeting {
@@ -116,6 +146,20 @@ struct MeetingPane: View {
     private func content(_ meeting: Meeting) -> some View {
         VStack(spacing: 0) {
             header(meeting)
+            Divider()
+            TranscriptLanguageBar(
+                meeting: meeting,
+                rendering: $rendering,
+                onTranslate: { isTranslating = true },
+                onFillGaps: {
+                    guard let target = meeting.translationTarget else { return }
+                    translations.translate(meeting, into: target, fillingGaps: true)
+                },
+                onRemove: {
+                    rendering = .original
+                    meetingStore.modify(meetingID) { $0.removeTranslation() }
+                }
+            )
             Divider()
             if find.isPresented {
                 TranscriptFindBar(
@@ -328,6 +372,11 @@ struct MeetingPane: View {
                         currentSearchMatch: find.current?.utteranceID == utterance.id
                             ? find.current
                             : nil,
+                        translatedText: rendering == .translated
+                            ? meeting.translatedText(for: utterance)
+                            : nil,
+                        isAwaitingTranslation: rendering == .translated
+                            && meeting.translatedText(for: utterance) == nil,
                         offersWordActions: !player.isPlaying,
                         otherSpeakers: meeting.speakers.filter { $0.id != utterance.speakerId },
                         canMergePrevious: index > 0,
@@ -535,17 +584,24 @@ struct MeetingPane: View {
         guard let meeting else { return nil }
         return ExportableMeeting(
             id: meetingID,
-            export: { export($0) },
-            exportVideo: { exportVideo() },
+            export: { export($0, rendering: $1) },
+            exportVideo: { exportVideo(rendering: $0) },
             canExportVideo: hasVideo
                 && meeting.audioExists
-                && !videoExports.state.isExporting
+                && !videoExports.state.isExporting,
+            translationTarget: meeting.translationTarget
         )
     }
 
     private var exportFilename: String {
         guard let meeting, let exportFormat else { return "Transcript" }
-        return "\(meeting.title).\(exportFormat.fileExtension)"
+        // The language in the name, so two exports of one meeting don't
+        // overwrite each other and neither has to be opened to tell which is
+        // which.
+        guard exportRendering == .translated, let target = meeting.translationTarget else {
+            return "\(meeting.title).\(exportFormat.fileExtension)"
+        }
+        return "\(meeting.title) (\(target.displayName)).\(exportFormat.fileExtension)"
     }
 
     /// Asks where to put the copy, then hands the work to the queue.
@@ -554,13 +610,17 @@ struct MeetingPane: View {
     /// `FileDocument` renders to `Data` up front, which is right for a
     /// transcript and impossible for a gigabyte of video, and only a panel can
     /// carry the trim checkbox.
-    private func exportVideo() {
+    private func exportVideo(rendering: TranscriptRendering = .original) {
         guard let meeting else { return }
 
+        let language = rendering == .translated ? meeting.translationTarget : nil
+
         let panel = NSSavePanel()
-        panel.title = "Export Video with Subtitles"
-        panel.nameFieldStringValue =
-            "\(meeting.title) with subtitles.\(meeting.audioURL.pathExtension)"
+        panel.title = language.map { "Export Video with \($0.displayName) Subtitles" }
+            ?? "Export Video with Subtitles"
+        panel.nameFieldStringValue = language.map {
+            "\(meeting.title) with \($0.displayName) subtitles.\(meeting.audioURL.pathExtension)"
+        } ?? "\(meeting.title) with subtitles.\(meeting.audioURL.pathExtension)"
         panel.canCreateDirectories = true
 
         // Only worth asking when there is a trim to apply.
@@ -585,14 +645,21 @@ struct MeetingPane: View {
         videoExports.export(
             meeting,
             to: destination,
-            trimmed: trimBox?.state == .on
+            trimmed: trimBox?.state == .on,
+            rendering: rendering
         )
     }
 
-    private func export(_ format: TranscriptExporter.Format) {
+    private func export(
+        _ format: TranscriptExporter.Format,
+        rendering: TranscriptRendering = .original
+    ) {
         guard let meeting else { return }
         exportFormat = format
-        exportDocument = try? TranscriptDocument(meeting: meeting, format: format)
+        exportRendering = rendering
+        exportDocument = try? TranscriptDocument(
+            meeting: meeting, format: format, rendering: rendering
+        )
     }
 }
 

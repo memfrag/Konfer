@@ -14,7 +14,7 @@ struct ExportCommands: Commands {
             Section {
                 ForEach(TranscriptExporter.Format.allCases) { format in
                     Button("Export as \(format.displayName)…") {
-                        meeting?.export(format)
+                        meeting?.export(format, .original)
                     }
                     .disabled(meeting == nil)
                 }
@@ -24,9 +24,31 @@ struct ExportCommands: Commands {
             // players that read them; this is for QuickTime, which doesn't.
             Section {
                 Button("Export Video with Subtitles…") {
-                    meeting?.exportVideo()
+                    meeting?.exportVideo(.original)
                 }
                 .disabled(meeting?.canExportVideo != true)
+            }
+            // One submenu rather than a second flat list of five: the same
+            // formats twice over would double the length of File ▸ Export for
+            // every meeting, translated or not. Named after the language, so
+            // the menu says which one without being opened. JSON is absent
+            // because it already carries both texts — a second file would be
+            // the same bytes under a longer name.
+            Section {
+                Menu(meeting?.translationTarget.map { "Export in \($0.displayName)" }
+                     ?? "Export Translation") {
+                    ForEach(TranscriptExporter.Format.allCases.filter(\.hasTranslatedVariant)) { format in
+                        Button("\(format.displayName)…") {
+                            meeting?.export(format, .translated)
+                        }
+                    }
+                    Divider()
+                    Button("Video with Subtitles…") {
+                        meeting?.exportVideo(.translated)
+                    }
+                    .disabled(meeting?.canExportVideo != true)
+                }
+                .disabled(meeting?.translationTarget == nil)
             }
         }
     }
@@ -38,17 +60,24 @@ struct ExportCommands: Commands {
 struct ExportableMeeting: Equatable {
 
     let id: UUID
-    let export: @MainActor (TranscriptExporter.Format) -> Void
+    let export: @MainActor (TranscriptExporter.Format, TranscriptRendering) -> Void
 
     /// Writes a copy of the recording with the subtitles inside it.
-    let exportVideo: @MainActor () -> Void
+    let exportVideo: @MainActor (TranscriptRendering) -> Void
 
     /// False for an audio-only meeting, and for one whose recording has moved.
     /// Subtitles need a picture to sit on.
     let canExportVideo: Bool
 
-    func callAsFunction(_ format: TranscriptExporter.Format) {
-        export(format)
+    /// The language a translation exists in, so the menu can name it and
+    /// disable itself when there is none.
+    let translationTarget: MeetingLanguage?
+
+    func callAsFunction(
+        _ format: TranscriptExporter.Format,
+        _ rendering: TranscriptRendering = .original
+    ) {
+        export(format, rendering)
     }
 
     static func == (lhs: ExportableMeeting, rhs: ExportableMeeting) -> Bool {

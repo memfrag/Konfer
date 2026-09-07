@@ -9,6 +9,15 @@ import Foundation
 /// The video export writes a subtitle track by hand, so the two things worth
 /// pinning down without a video file are the sample encoding and the promise
 /// that an embedded cue says exactly what the SubRip one says.
+/// A box for what a stubbed export was handed.
+///
+/// `nonisolated` because the queue calls its `write` through a `@Sendable`
+/// closure; the app builds with default-`MainActor` isolation, so a nested
+/// type would inherit it and refuse to be called from one.
+private nonisolated final class Recorder: @unchecked Sendable {
+    var value: TranscriptRendering?
+}
+
 @MainActor
 struct SubtitledVideoTests {
 
@@ -85,7 +94,7 @@ struct SubtitledVideoTests {
 
     @Test("A finished export reports where it put the file")
     func queueReportsFinished() async throws {
-        let queue = VideoExportQueue { _, url, _, progress in
+        let queue = VideoExportQueue { _, url, _, _, progress in
             progress(0.5)
             _ = url
         }
@@ -99,7 +108,7 @@ struct SubtitledVideoTests {
 
     @Test("A failed export surfaces why, in words")
     func queueReportsFailure() async throws {
-        let queue = VideoExportQueue { _, _, _, _ in
+        let queue = VideoExportQueue { _, _, _, _, _ in
             throw VideoExportError.notAVideo(URL(fileURLWithPath: "/tmp/standup.wav"))
         }
 
@@ -116,7 +125,7 @@ struct SubtitledVideoTests {
 
     @Test("Only one export runs at a time")
     func queueRefusesASecondExport() async throws {
-        let queue = VideoExportQueue { _, _, _, _ in
+        let queue = VideoExportQueue { _, _, _, _, _ in
             try await Task.sleep(for: .seconds(5))
         }
         let first = URL(fileURLWithPath: "/tmp/first.mov")
@@ -132,7 +141,7 @@ struct SubtitledVideoTests {
 
     @Test("Cancelling leaves the queue idle rather than failed")
     func cancellingIsNotAFailure() async throws {
-        let queue = VideoExportQueue { _, _, _, _ in
+        let queue = VideoExportQueue { _, _, _, _, _ in
             try await Task.sleep(for: .seconds(5))
         }
 
@@ -142,6 +151,20 @@ struct SubtitledVideoTests {
         try await settle { queue.state == .idle }
 
         #expect(queue.state == .idle)
+    }
+
+    @Test("The language the subtitles are in reaches the writer")
+    func queuePassesTheRendering() async throws {
+        let seen = Recorder()
+        let queue = VideoExportQueue { _, _, _, rendering, _ in
+            seen.value = rendering
+        }
+        let destination = URL(fileURLWithPath: "/tmp/konfer-test-translated.mov")
+
+        queue.export(makeMeeting(), to: destination, trimmed: false, rendering: .translated)
+        try await settle { queue.state == .finished(destination) }
+
+        #expect(seen.value == .translated)
     }
 
     // MARK: - Helpers

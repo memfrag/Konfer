@@ -18,6 +18,14 @@ struct UtteranceRow: View {
     let searchMatches: [TranscriptMatch]
     let currentSearchMatch: TranscriptMatch?
 
+    /// This turn in the translation language, when the pane is showing one and
+    /// this turn has one.
+    var translatedText: String?
+
+    /// True when the pane is showing the translation and this turn hasn't got
+    /// one — never translated, or edited since.
+    var isAwaitingTranslation = false
+
     /// Whether clicking a word should offer what can be done at it.
     let offersWordActions: Bool
     let otherSpeakers: [SpeakerLabel]
@@ -62,6 +70,12 @@ struct UtteranceRow: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .help("Edited by hand — word timings no longer apply to this line.")
+                    }
+                    if isAwaitingTranslation {
+                        Image(systemName: "character.bubble")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .help("Not translated, so this line is shown as it was said.")
                     }
                 }
 
@@ -188,7 +202,18 @@ struct UtteranceRow: View {
     // MARK: - Text
 
     @ViewBuilder private var text: some View {
-        if let words = utterance.words {
+        if let translatedText {
+            // Translated text has no word timings — the model timed the words
+            // that were said, and these are not those — so it takes the same
+            // path a hand-edited turn takes: the whole line seeks to its own
+            // start, and the highlight goes on the string.
+            plain(translatedText)
+        } else if isAwaitingTranslation {
+            // The original, dimmed. A reading view with holes in it is
+            // unreadable, and a blank row says nothing about why.
+            plain(utterance.text)
+                .opacity(0.5)
+        } else if let words = utterance.words {
             // Clicking a word seeks to it. Text is not selectable here — see
             // `TranscriptText`; selection lives in edit mode.
             TranscriptText(
@@ -205,12 +230,20 @@ struct UtteranceRow: View {
             // to its own start.
             // An edited turn has no tokens to tint, so the highlight goes on
             // the string itself.
-            Text(highlighted(utterance.text))
-                .fixedSize(horizontal: false, vertical: true)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onSeek)
-                .accessibilityAddTraits(.isButton)
+            plain(utterance.text)
         }
+    }
+
+    /// A turn with no word timings to click through.
+    ///
+    /// Shared by the three cases that have none: hand-edited, translated, and
+    /// waiting to be translated.
+    private func plain(_ string: String) -> some View {
+        Text(highlighted(string))
+            .fixedSize(horizontal: false, vertical: true)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onSeek)
+            .accessibilityAddTraits(.isButton)
     }
 
     /// The turn's text with its search matches marked.
@@ -265,12 +298,17 @@ struct UtteranceRow: View {
     @ViewBuilder private var menu: some View {
         // First, because reading is the common case and text is not selectable
         // while reading — see `TranscriptText`.
+        // Copies the language on screen. Copying Swedish out of a pane
+        // showing English would be a surprise, and the reader can always
+        // switch back.
         Button("Copy Text") {
-            copy(utterance.text)
+            copy(shownText)
         }
 
         Button("Copy with Speaker and Time") {
-            copy(TranscriptExporter.plainLine(for: utterance, speaker: speakerName))
+            copy(TranscriptExporter.plainLine(
+                for: utterance, speaker: speakerName, text: shownText
+            ))
         }
 
         Divider()
@@ -297,6 +335,10 @@ struct UtteranceRow: View {
         Button("Merge with Next") { onMerge(.next) }
             .disabled(!canMergeNext)
     }
+
+    /// What the row is actually showing, which is the translation only when
+    /// there is one to show.
+    private var shownText: String { translatedText ?? utterance.text }
 
     private func copy(_ string: String) {
         NSPasteboard.general.clearContents()

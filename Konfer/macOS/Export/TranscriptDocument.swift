@@ -20,8 +20,12 @@ struct TranscriptDocument: FileDocument {
     let data: Data
     let contentType: UTType
 
-    init(meeting: Meeting, format: TranscriptExporter.Format) throws {
-        data = try TranscriptExporter.data(for: meeting, format: format)
+    init(
+        meeting: Meeting,
+        format: TranscriptExporter.Format,
+        rendering: TranscriptRendering = .original
+    ) throws {
+        data = try TranscriptExporter.data(for: meeting, format: format, rendering: rendering)
         contentType = switch format {
         case .markdown: .plainText
         case .json: .json
