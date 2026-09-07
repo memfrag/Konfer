@@ -29,6 +29,15 @@ final class TranscriptionPipeline {
         /// Follows from `language`, unless overridden for benchmarking.
         let backend: ASRBackendKind
         let fastTranscription: Bool
+
+        /// The stretch to transcribe, or nil for the whole recording.
+        let trim: KeptRange?
+
+        /// The meeting this run replaces, when it is a re-run rather than an
+        /// import. A failed or garbled transcript is worth another attempt on a
+        /// narrower range, and it should land back on the same row in the
+        /// sidebar rather than beside it.
+        let replacing: UUID?
     }
 
     enum Stage: Equatable {
@@ -112,15 +121,20 @@ final class TranscriptionPipeline {
     func enqueue(
         _ url: URL,
         language: MeetingLanguage,
-        expectedSpeakers: Int? = nil
+        expectedSpeakers: Int? = nil,
+        trim: KeptRange? = nil,
+        replacing: UUID? = nil,
+        title: String? = nil
     ) {
         let job = Job(
             sourceURL: url,
-            title: url.deletingPathExtension().lastPathComponent,
+            title: title ?? url.deletingPathExtension().lastPathComponent,
             language: language,
             expectedSpeakers: expectedSpeakers,
             backend: Self.backendOverride ?? ASRBackendKind(transcribing: language),
-            fastTranscription: fastTranscription
+            fastTranscription: fastTranscription,
+            trim: trim,
+            replacing: replacing
         )
         queue.append(job)
         startNextIfIdle()
@@ -191,7 +205,10 @@ final class TranscriptionPipeline {
 
             // 1. Normalize the input. Video files get their audio extracted to a
             //    temporary file; audio files pass straight through.
-            let audio = try await AudioSourcePreparer.prepare(job.sourceURL)
+            let audio = try await AudioSourcePreparer.prepare(
+                job.sourceURL,
+                trimmedTo: job.trim
+            )
             prepared = audio
             try checkCancellation()
 
@@ -262,33 +279,84 @@ final class TranscriptionPipeline {
             try checkCancellation()
 
             // 4. The merge, and the meeting it produces.
-            let utterances = SpeakerAligner.align(
-                words: transcribed.words,
-                segments: segments
+            //
+            //    Every stage above read the prepared file, so its timestamps
+            //    start at zero even when that file is an extract from the
+            //    middle of the recording. They are put back here, once, so
+            //    that nothing downstream — playback, waveform, export — has to
+            //    know a trim happened.
+            let utterances = Self.shifting(
+                SpeakerAligner.align(words: transcribed.words, segments: segments),
+                by: audio.startOffset
             )
             let speakers = makeSpeakerLabels(segments: segments, utterances: utterances)
+            let cuts = transcribed.sliceCuts.map { $0 + audio.startOffset }
 
-            let meeting = Meeting(
-                id: UUID(),
-                title: job.title,
-                audioPath: job.sourceURL.path,
-                duration: audio.duration,
-                importedAt: Date(),
-                language: job.language,
-                speakers: speakerStore.annotate(speakers),
-                utterances: utterances,
-                degraded: degraded,
-                sliceCuts: transcribed.sliceCuts.isEmpty ? nil : transcribed.sliceCuts,
-                wasFastTranscribed: job.fastTranscription ? true : nil
-            )
-            meetingStore.add(meeting)
-            lastFinishedMeetingID = meeting.id
+            if let replacing = job.replacing, var existing = meetingStore.meeting(replacing) {
+                // A re-run replaces the transcript and nothing else: the title,
+                // the place in the library and the trim that prompted the re-run
+                // are all still the user's.
+                existing.speakers = speakerStore.annotate(speakers)
+                existing.utterances = utterances
+                existing.degraded = degraded
+                existing.sliceCuts = cuts.isEmpty ? nil : cuts
+                existing.wasFastTranscribed = job.fastTranscription ? true : nil
+                existing.duration = audio.sourceDuration
+                meetingStore.update(existing)
+                lastFinishedMeetingID = existing.id
+            } else {
+                let meeting = Meeting(
+                    id: UUID(),
+                    title: job.title,
+                    audioPath: job.sourceURL.path,
+                    // The recording's own length, not the extract's: the
+                    // library points at the whole file whatever was read.
+                    duration: audio.sourceDuration,
+                    importedAt: Date(),
+                    language: job.language,
+                    speakers: speakerStore.annotate(speakers),
+                    utterances: utterances,
+                    degraded: degraded,
+                    sliceCuts: cuts.isEmpty ? nil : cuts,
+                    // Left nil on a trimmed import: nothing was transcribed
+                    // outside the range, so there is nothing to collapse.
+                    keptRange: nil,
+                    wasFastTranscribed: job.fastTranscription ? true : nil
+                )
+                meetingStore.add(meeting)
+                lastFinishedMeetingID = meeting.id
+            }
 
         } catch let error as PipelineError {
             if case .cancelled = error { return }
             lastError = error
         } catch {
             lastError = .transcriptionFailed(underlying: error)
+        }
+    }
+
+    /// Moves turns from the extract's timeline back onto the recording's.
+    ///
+    /// Internal so it can be tested directly: it is the whole of what makes a
+    /// trimmed transcription line up with the untouched file it came from, and
+    /// an off-by-one here is a transcript that plays against the wrong audio.
+    static func shifting(
+        _ utterances: [Utterance],
+        by offset: TimeInterval
+    ) -> [Utterance] {
+        guard offset != 0 else { return utterances }
+        return utterances.map { utterance in
+            Utterance(
+                id: utterance.id,
+                speakerId: utterance.speakerId,
+                start: utterance.start + offset,
+                end: utterance.end + offset,
+                text: utterance.text,
+                words: utterance.words?.map {
+                    WordSpan(word: $0.word, start: $0.start + offset, end: $0.end + offset)
+                },
+                isEdited: utterance.isEdited
+            )
         }
     }
 

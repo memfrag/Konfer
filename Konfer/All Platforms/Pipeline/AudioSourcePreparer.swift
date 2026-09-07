@@ -12,8 +12,18 @@ nonisolated struct PreparedAudio: Sendable {
     /// video input, a temporary audio-only extraction of it.
     let url: URL
 
-    /// Length of the recording, used for the player and the library row.
+    /// Length of `url` — the trimmed extract when there is one, so the stages
+    /// reading it report progress against what they actually process.
     let duration: TimeInterval
+
+    /// Length of the file the user chose, which is what the meeting records:
+    /// the library points at their recording, whole, however little of it was
+    /// transcribed.
+    let sourceDuration: TimeInterval
+
+    /// Where the prepared audio begins within the source, so the pipeline can
+    /// put the timestamps back where they belong. Zero unless trimmed.
+    let startOffset: TimeInterval
 
     /// Set when `url` is a temporary file this run created.
     let temporaryFile: URL?
@@ -34,33 +44,61 @@ nonisolated struct PreparedAudio: Sendable {
 ///
 nonisolated enum AudioSourcePreparer {
 
-    static func prepare(_ url: URL) async throws -> PreparedAudio {
+    /// - Parameter trimmedTo: The stretch to transcribe, or nil for all of it.
+    ///   A trim always goes through the export path, audio or video, because
+    ///   the stages downstream take a file and have nowhere to put a range.
+    static func prepare(
+        _ url: URL,
+        trimmedTo trim: KeptRange? = nil
+    ) async throws -> PreparedAudio {
 
         let asset = AVURLAsset(url: url)
 
-        let duration: TimeInterval
+        let sourceDuration: TimeInterval
         do {
-            duration = try await asset.load(.duration).seconds
+            sourceDuration = try await asset.load(.duration).seconds
         } catch {
             throw PipelineError.audioUnreadable(url, underlying: error)
         }
 
         let hasVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
-        guard hasVideo else {
-            return PreparedAudio(url: url, duration: duration, temporaryFile: nil)
+        guard hasVideo || trim != nil else {
+            return PreparedAudio(
+                url: url,
+                duration: sourceDuration,
+                sourceDuration: sourceDuration,
+                startOffset: 0,
+                temporaryFile: nil
+            )
         }
 
         guard try await !asset.loadTracks(withMediaType: .audio).isEmpty else {
             throw PipelineError.noAudioTrack(url)
         }
 
-        let extracted = try await extractAudio(from: asset, named: url.lastPathComponent)
-        return PreparedAudio(url: extracted, duration: duration, temporaryFile: extracted)
+        // Clamped to the file: a range dragged to the very end can name a
+        // moment a fraction past the last sample, and an export session given
+        // one fails rather than shrugging.
+        let range = trim.map {
+            KeptRange(
+                start: max(0, min($0.start, sourceDuration)),
+                end: max(0, min($0.end, sourceDuration))
+            )
+        }
+
+        let extracted = try await extractAudio(from: asset, trimmedTo: range)
+        return PreparedAudio(
+            url: extracted,
+            duration: range.map(\.duration) ?? sourceDuration,
+            sourceDuration: sourceDuration,
+            startOffset: range?.start ?? 0,
+            temporaryFile: extracted
+        )
     }
 
     private static func extractAudio(
         from asset: AVURLAsset,
-        named name: String
+        trimmedTo range: KeptRange?
     ) async throws -> URL {
 
         let destination = FileManager.default.temporaryDirectory
@@ -72,6 +110,13 @@ nonisolated enum AudioSourcePreparer {
             presetName: AVAssetExportPresetAppleM4A
         ) else {
             throw PipelineError.noAudioTrack(asset.url)
+        }
+
+        if let range {
+            session.timeRange = CMTimeRange(
+                start: CMTime(seconds: range.start, preferredTimescale: 600),
+                end: CMTime(seconds: range.end, preferredTimescale: 600)
+            )
         }
 
         do {

@@ -68,6 +68,14 @@ nonisolated enum TranscriptExporter {
         let date = meeting.importedAt.formatted(date: .abbreviated, time: .shortened)
         lines.append("*\(Timecode.short(meeting.duration)) · transcribed \(date)*")
 
+        if let kept = meeting.keptRange {
+            lines.append("")
+            lines.append(
+                "*Trimmed to \(Timecode.short(kept.start))–\(Timecode.short(kept.end)); "
+                + "the rest of the recording is not included.*"
+            )
+        }
+
         if meeting.degraded == .diarization {
             lines.append("")
             lines.append(
@@ -77,7 +85,7 @@ nonisolated enum TranscriptExporter {
         }
         lines.append("")
 
-        for utterance in meeting.utterances {
+        for utterance in meeting.keptUtterances {
             let name = meeting.displayName(for: utterance.speakerId)
             let attribution = Self.attribution(for: utterance, speaker: name)
             lines.append("**\(attribution)** \(utterance.text)")
@@ -130,11 +138,22 @@ private nonisolated struct ExportedMeeting: Encodable {
         let words: [Word]?
     }
 
+    struct Kept: Encodable {
+        let start: TimeInterval
+        let end: TimeInterval
+    }
+
     let title: String
     let duration: TimeInterval
     let importedAt: Date
     let language: String
     let degraded: String?
+
+    /// Present only when the meeting is trimmed. A consumer that ignores it
+    /// still gets a coherent transcript — the turns outside are simply absent —
+    /// but one that reports timestamps can say what the file covers.
+    let trimmedTo: Kept?
+
     let speakers: [Speaker]
     let transcript: [Turn]
 
@@ -144,10 +163,11 @@ private nonisolated struct ExportedMeeting: Encodable {
         importedAt = meeting.importedAt
         language = meeting.language.rawValue
         degraded = meeting.degraded?.rawValue
+        trimmedTo = meeting.keptRange.map { Kept(start: $0.start, end: $0.end) }
         speakers = meeting.speakers.map {
             Speaker(id: $0.id, name: $0.name, totalDuration: $0.totalDuration)
         }
-        transcript = meeting.utterances.map { utterance in
+        transcript = meeting.keptUtterances.map { utterance in
             Turn(
                 speakerId: utterance.speakerId,
                 speaker: meeting.displayName(for: utterance.speakerId),

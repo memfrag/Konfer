@@ -207,6 +207,28 @@ nonisolated extension Meeting {
         utterances[index].isEdited = true
     }
 
+    // MARK: - Trimming
+
+    /// Keeps only the given stretch of the recording.
+    ///
+    /// Nothing is deleted: the turns outside it stay in the file and come back
+    /// the moment the range widens or clears. That is deliberate — a trim is a
+    /// view of a meeting, not an edit to it, and the alternative is asking
+    /// someone to be sure about a boundary they chose by dragging.
+    ///
+    /// A range covering everything is stored as no range at all, so "trimmed
+    /// back to the whole recording" and "never trimmed" are the same state
+    /// rather than two that look alike.
+    mutating func keep(_ range: KeptRange) {
+        guard range.duration > 0 else { return }
+        let coversEverything = range.start <= 0 && range.end >= duration
+        keptRange = coversEverything ? nil : range
+    }
+
+    mutating func keepEverything() {
+        keptRange = nil
+    }
+
     // MARK: - Recording
 
     /// Points the meeting at a recording.

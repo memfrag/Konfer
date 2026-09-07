@@ -210,6 +210,41 @@ public nonisolated enum MeetingLanguage: String, Codable, CaseIterable, Sendable
     }
 }
 
+// MARK: - KeptRange
+
+/// The stretch of a recording that counts.
+///
+/// Set by trimming a finished transcript. Everything outside it is collapsed
+/// out of the transcript and left out of exports, but nothing is deleted:
+/// widening the handles brings the text back, because the only honest thing to
+/// throw away is nothing at all. A meeting whose recording opened with ten
+/// minutes of people joining is still a meeting with that audio in it.
+///
+/// Not to be confused with trimming *before* transcription, which limits what
+/// the pipeline ever reads. That one leaves this nil — there is nothing
+/// outside the range to hide.
+nonisolated struct KeptRange: Codable, Hashable, Sendable {
+
+    let start: TimeInterval
+    let end: TimeInterval
+
+    init(start: TimeInterval, end: TimeInterval) {
+        self.start = min(start, end)
+        self.end = max(start, end)
+    }
+
+    var duration: TimeInterval { end - start }
+
+    /// Whether a turn survives the trim.
+    ///
+    /// Any overlap counts, rather than requiring containment: a sentence that
+    /// begins a second before the handle is part of what was kept, and losing
+    /// it would make the trim feel like it cuts mid-word.
+    func keeps(_ utterance: Utterance) -> Bool {
+        utterance.end > start && utterance.start < end
+    }
+}
+
 // MARK: - DegradedStage
 
 /// Records that a run completed with one stage missing.
@@ -250,6 +285,11 @@ nonisolated struct Meeting: Identifiable, Codable, Hashable, Sendable {
     /// under the player. Optional so earlier meetings still decode.
     var sliceCuts: [TimeInterval]?
 
+    /// The part of the recording that counts, or nil for all of it.
+    ///
+    /// Optional so meetings written before trimming existed still decode.
+    var keptRange: KeptRange?
+
     /// Set when this transcript was produced with fast (chunked) transcription,
     /// which is known to drop speech. Optional so meetings written before the
     /// setting existed still decode.
@@ -260,6 +300,30 @@ nonisolated struct Meeting: Identifiable, Codable, Hashable, Sendable {
     /// Whether the source recording is still where we left it. Checked when a
     /// meeting is opened rather than swept at launch.
     var audioExists: Bool { FileManager.default.fileExists(atPath: audioPath) }
+
+    /// The turns inside the kept range — what the transcript shows, what
+    /// search looks through, and what an export contains.
+    ///
+    /// The one place the rule lives, so the pane, the find bar and both
+    /// exporters cannot come to different conclusions about what is in the
+    /// meeting.
+    var keptUtterances: [Utterance] {
+        guard let keptRange else { return utterances }
+        return utterances.filter { keptRange.keeps($0) }
+    }
+
+    /// The turns the trim is hiding, in transcript order, split into the run
+    /// before the kept range and the run after it.
+    ///
+    /// Empty arrays when nothing is trimmed, which is what lets the pane draw
+    /// its "12 lines hidden" rows without a special case.
+    var trimmedUtterances: (before: [Utterance], after: [Utterance]) {
+        guard let keptRange else { return ([], []) }
+        return (
+            utterances.filter { $0.end <= keptRange.start },
+            utterances.filter { $0.start >= keptRange.end }
+        )
+    }
 
     func speaker(_ id: String) -> SpeakerLabel? {
         speakers.first { $0.id == id }

@@ -56,8 +56,13 @@ struct Sidebar: View {
         .sheet(item: $pending) { pending in
             switch pending {
             case .recording(let url, let alreadyTranscribed):
-                ImportSheet(url: url, alreadyTranscribed: alreadyTranscribed) { language, speakers in
-                    pipeline.enqueue(url, language: language, expectedSpeakers: speakers)
+                ImportSheet(url: url, alreadyTranscribed: alreadyTranscribed) { language, speakers, trim in
+                    pipeline.enqueue(
+                        url,
+                        language: language,
+                        expectedSpeakers: speakers,
+                        trim: trim
+                    )
                 } onOpenExisting: { meeting in
                     selection = .meeting(meeting.id)
                 }

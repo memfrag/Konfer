@@ -54,6 +54,17 @@ nonisolated enum WaveformStore {
         return waveform
     }
 
+    /// The envelope of a file that is not a meeting yet.
+    ///
+    /// Uncached on purpose: the import sheet has no id to key a cache by, and
+    /// the file may never become a meeting at all. It is read once, while
+    /// someone is looking at a sheet they opened deliberately.
+    static func waveform(at url: URL) async -> Waveform? {
+        await Task.detached(priority: .userInitiated) {
+            try? computeWaveform(at: url)
+        }.value
+    }
+
     private static func cache(_ waveform: Waveform, for meetingID: UUID) {
         try? FileManager.default.createDirectory(
             at: directory,

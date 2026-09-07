@@ -43,9 +43,14 @@ struct RecorderView: View {
             get: { controller.finishedRecording.map(FinishedRecording.init) },
             set: { if $0 == nil { controller.acknowledgeFinishedRecording() } }
         )) { finished in
-            ImportSheet(url: finished.url, alreadyTranscribed: nil) { language, speakers in
-                pipeline.enqueue(finished.url, language: language, expectedSpeakers: speakers)
-            } onOpenExisting: { _ in }
+            ImportSheet(url: finished.url) { language, speakers, trim in
+                pipeline.enqueue(
+                    finished.url,
+                    language: language,
+                    expectedSpeakers: speakers,
+                    trim: trim
+                )
+            }
         }
     }
 
