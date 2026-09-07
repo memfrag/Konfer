@@ -10,5 +10,30 @@
     <string>https://raw.githubusercontent.com/memfrag/Konfer/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>AvJMcXvL9lwbU8D00Z9uECjR9zdeOlcsl7Rktg/hQVE=</string>
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <!-- SubRip is somebody else's format and macOS declares no type for
+                 it, so this is an imported declaration rather than an exported
+                 one. Without it a .srt export lands in a save panel that only
+                 knows plain text and renames the file to .txt. WebVTT needs no
+                 equivalent: org.w3.webvtt already exists. -->
+            <key>UTTypeIdentifier</key>
+            <string>org.subrip.srt</string>
+            <key>UTTypeDescription</key>
+            <string>SubRip Subtitles</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.plain-text</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>srt</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>

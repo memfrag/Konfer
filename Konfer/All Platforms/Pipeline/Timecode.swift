@@ -26,4 +26,23 @@ nonisolated enum Timecode {
             total / 3600, (total % 3600) / 60, total % 60
         )
     }
+
+    /// `00:12:34.567` for WebVTT, `00:12:34,567` for SubRip — the two formats
+    /// differ in that one character and nothing else.
+    ///
+    /// Milliseconds are taken from the whole value rather than from a
+    /// remainder, so a time a hair under a second boundary rounds to the next
+    /// second instead of to `…:07.1000`.
+    static func subtitle(_ seconds: TimeInterval, decimalSeparator: String) -> String {
+        let milliseconds = max(0, Int((seconds * 1000).rounded()))
+        let total = milliseconds / 1000
+        return String(
+            format: "%02d:%02d:%02d%@%03d",
+            total / 3600,
+            (total % 3600) / 60,
+            total % 60,
+            decimalSeparator,
+            milliseconds % 1000
+        )
+    }
 }

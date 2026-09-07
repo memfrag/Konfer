@@ -6,15 +6,18 @@ import Foundation
 
 /// Renders a meeting for export.
 ///
-/// Two formats, both reflecting every edit. Subtitle formats were deliberately
-/// left out: the goal is readable prose, and a speaker turn makes a fine
-/// paragraph but a useless subtitle cue.
+/// Four formats, all reflecting every edit and all stopping at the trim.
+/// Prose in Markdown and JSON; cues in WebVTT and SubRip, which
+/// ``SubtitleExporter`` cuts at the model's own word timings rather than
+/// putting a whole speaker turn on screen at once.
 ///
 nonisolated enum TranscriptExporter {
 
     enum Format: String, CaseIterable, Identifiable {
         case markdown
         case json
+        case webVTT
+        case subRip
 
         var id: String { rawValue }
 
@@ -22,6 +25,8 @@ nonisolated enum TranscriptExporter {
             switch self {
             case .markdown: "Markdown"
             case .json: "JSON"
+            case .webVTT: "WebVTT Subtitles"
+            case .subRip: "SubRip Subtitles"
             }
         }
 
@@ -29,6 +34,8 @@ nonisolated enum TranscriptExporter {
             switch self {
             case .markdown: "md"
             case .json: "json"
+            case .webVTT: "vtt"
+            case .subRip: "srt"
             }
         }
     }
@@ -39,6 +46,10 @@ nonisolated enum TranscriptExporter {
             Data(markdown(for: meeting).utf8)
         case .json:
             try json(for: meeting)
+        case .webVTT:
+            Data(SubtitleExporter.webVTT(for: meeting).utf8)
+        case .subRip:
+            Data(SubtitleExporter.srt(for: meeting).utf8)
         }
     }
 
