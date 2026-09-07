@@ -14,6 +14,7 @@ struct SidebarFooter: View {
 
     @Environment(TranscriptionPipeline.self) private var pipeline
     @Environment(VideoExportQueue.self) private var videoExports
+    @Environment(TranslationQueue.self) private var translations
 
     var body: some View {
         Group {
@@ -24,6 +25,15 @@ struct SidebarFooter: View {
                     .footerChrome()
             } else if let job = pipeline.activeJob {
                 progressFooter(job)
+                    .footerChrome()
+            } else if translations.state.isTranslating {
+                translationFooter()
+                    .footerChrome()
+            } else if videoExports.state.isExporting {
+                exportFooter()
+                    .footerChrome()
+            } else if translations.state != .idle {
+                translationFooter()
                     .footerChrome()
             } else if videoExports.state != .idle {
                 exportFooter()
@@ -152,6 +162,75 @@ struct SidebarFooter: View {
                         .foregroundStyle(.orange)
                 }
                 Button("Dismiss") { videoExports.acknowledge() }
+                    .controlSize(.small)
+
+            case .idle:
+                EmptyView()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Two minutes for an hour of meeting is long enough to need saying, and
+    /// the count is exact — turns are the one unit of work in this app that can
+    /// be counted rather than estimated.
+    @ViewBuilder private func translationFooter() -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            switch translations.state {
+            case .translating(let done, let total):
+                HStack {
+                    Text(translations.title ?? "Translating")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    Spacer()
+                    Button {
+                        translations.cancel()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Stop translating and keep the lines already done")
+                }
+
+                ProgressView(value: translations.state.fraction ?? 0)
+                    .controlSize(.small)
+
+                HStack(spacing: 4) {
+                    Text("Translating")
+                    Text("\(done) of \(total)")
+                    Spacer()
+                    if let startedAt = translations.startedAt {
+                        Text(timerInterval: startedAt...Date.distantFuture, countsDown: false)
+                            .monospacedDigit()
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            case .finished(let lines, let target):
+                Label {
+                    Text("Translated \(lines) \(lines == 1 ? "line" : "lines") into \(target.displayName)")
+                        .font(.caption)
+                        .lineLimit(2)
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+                Button("Dismiss") { translations.acknowledge() }
+                    .controlSize(.small)
+
+            case .failed(let message):
+                Label {
+                    Text(message)
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+                Button("Dismiss") { translations.acknowledge() }
                     .controlSize(.small)
 
             case .idle:

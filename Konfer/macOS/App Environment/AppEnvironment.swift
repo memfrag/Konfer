@@ -46,6 +46,10 @@ public final class AppEnvironment {
     /// outlive the pane that started it.
     internal let videoExports: VideoExportQueue
 
+    /// Translates finished transcripts. Shared for the same reason: two
+    /// minutes of work has to outlive the pane that asked for it.
+    internal let translations: TranslationQueue
+
     // MARK: - Init
 
     /// Creates an environment with the provided dependencies.
@@ -59,7 +63,8 @@ public final class AppEnvironment {
         speakerStore: SpeakerStore,
         pipeline: TranscriptionPipeline,
         downloads: ModelDownloadQueue,
-        videoExports: VideoExportQueue
+        videoExports: VideoExportQueue,
+        translations: TranslationQueue
     ) {
         self.appSettings = appSettings
         self.engineeringMode = engineeringMode
@@ -68,5 +73,6 @@ public final class AppEnvironment {
         self.pipeline = pipeline
         self.downloads = downloads
         self.videoExports = videoExports
+        self.translations = translations
     }
 }

@@ -28,7 +28,8 @@ extension AppEnvironment {
                 speakerStore: speakerStore
             ),
             downloads: ModelDownloadQueue(),
-            videoExports: VideoExportQueue()
+            videoExports: VideoExportQueue(),
+            translations: TranslationQueue(meetingStore: meetingStore)
         )
     }
 }

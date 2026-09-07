@@ -24,6 +24,7 @@ extension View {
             .environment(appEnvironment.pipeline)
             .environment(appEnvironment.downloads)
             .environment(appEnvironment.videoExports)
+            .environment(appEnvironment.translations)
     }
 
     #if DEBUG
@@ -37,6 +38,7 @@ extension View {
             .environment(appEnvironment.pipeline)
             .environment(appEnvironment.downloads)
             .environment(appEnvironment.videoExports)
+            .environment(appEnvironment.translations)
     }
     #endif
 }
