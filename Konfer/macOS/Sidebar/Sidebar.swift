@@ -172,7 +172,7 @@ struct Sidebar: View {
         }
         .listStyle(.sidebar)
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 340)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .safeAreaBar(edge: .bottom, spacing: 0) {
             SidebarFooter()
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "Search transcripts")
