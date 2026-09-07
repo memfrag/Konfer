@@ -80,8 +80,20 @@ struct ExportableMeeting: Equatable {
         export(format, rendering)
     }
 
+    /// Every field the menu reads, and none of the closures, which cannot be
+    /// compared.
+    ///
+    /// The id alone is not enough, and quietly so: SwiftUI only republishes a
+    /// focused value that compares unequal, so a meeting whose translation has
+    /// just finished would still be offered to the menu bar as the meeting it
+    /// was a minute ago — with the translated exports greyed out and no way to
+    /// reach them short of selecting another meeting and coming back. The same
+    /// went for `canExportVideo`, which changes when the video probe resolves
+    /// and when an export finishes.
     static func == (lhs: ExportableMeeting, rhs: ExportableMeeting) -> Bool {
         lhs.id == rhs.id
+            && lhs.canExportVideo == rhs.canExportVideo
+            && lhs.translationTarget == rhs.translationTarget
     }
 }
 
