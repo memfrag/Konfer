@@ -1,9 +1,9 @@
 # Konfer
 
-On-device transcription of multi-speaker meetings, in ten languages.
-Drop in a recording and get a transcript where every line carries a timestamp
-and a speaker. Nothing leaves the machine except the models themselves, which
-are downloaded once, on purpose, before anything runs.
+On-device transcription of multi-speaker meetings, in ten languages — and
+translation between them. Drop in a recording and get a transcript where every
+line carries a timestamp and a speaker. Nothing leaves the machine except the
+models themselves, which are downloaded once, on purpose, before anything runs.
 
 ## How it works
 
@@ -74,6 +74,68 @@ downloaded:
 
 12,383 words across 356 turns and 6 speakers, covering 87% of the recording's
 duration. Peak memory about 1.4 GB.
+
+## Translation
+
+A finished transcript can be read in another language, and exported in one.
+Translation is a **reading of the record, never a replacement for it**: the
+pane shows one language or the other, the original is always there to switch
+back to, and every translated line can be thrown away and made again from the
+turn it came from.
+
+Apple's on-device translation does the work, so this too stays on the machine.
+Measured on an M3 Ultra, Swedish to English:
+
+| Work | Time |
+|---|---|
+| One turn | 0.34 s |
+| A 1 h 17 m meeting, 356 turns | 122 s |
+| Transcribing that same meeting | 585 s |
+
+So a translation costs about a fifth of the run that produced the transcript.
+That is cheap enough to do twice and far too slow to do unasked, which is why
+it is an action on a finished transcript rather than a fourth pipeline stage.
+
+Probing all 72 ordered pairs of Konfer's ten languages, **68 are available**.
+Polish needs a download against every one of them, and four pairs do not exist
+at all: **Swedish and Danish against Polish**, in both directions. Konfer
+refuses those rather than hopping through English — both languages reach
+English perfectly well, and that is exactly the temptation. A pivot returns a
+fluent Polish sentence that is a translation of a translation, with nothing on
+screen to say which half to distrust.
+
+The models belong to macOS, not to Konfer, so they are not in Settings ▸ Models
+and there is nothing of ours to measure or delete — the same arrangement as
+Apple's speech locales. Konfer's own translating runs on a headless
+`TranslationSession`, which is what makes it a background job rather than
+something bolted to a visible view; the one thing such a session cannot do is
+ask for a language pack, so the Translate sheet carries an otherwise empty view
+whose only job is to put up the system's download prompt.
+
+### Translated subtitles
+
+Translated text has no word timings — the model timed the words that were said,
+and these are not those — so cutting it into cues by character count and
+interpolating would mean inventing the times to cut at. Konfer invents none.
+A turn is translated whole, for the sentence context that decides where Swedish
+and German put the verb, and the translation is then spread across the cues the
+original was already cut into, each taking the share that matches the source
+characters it carried.
+
+Every start and end is a time the recogniser produced. The only thing chosen is
+where in the translated sentence to break, which is a claim about the text and
+not about the recording. Rejoined, the pieces are exactly the translation:
+nothing is dropped to make it fit.
+
+### What an edit costs
+
+A translated line is derived from a turn's text, so editing that turn drops its
+line — the same bargain word timings already make, and a far cheaper one to
+undo. Translating the rest sends only the turns that have nothing, about a third
+of a second each rather than the whole meeting's two minutes. Renaming,
+reassigning and merging speakers leave translations alone; none of them touches
+a word that was said. Trimming keeps them, for the same reason it keeps the
+text.
 
 ## Models
 
@@ -262,8 +324,10 @@ corrupt each other's download.
 
 ## Out of scope
 
-No live recording or streaming transcription, and no summarisation or other
-LLM post-processing. Konfer transcribes files and stops.
+No live recording or streaming transcription, and no summarisation, action
+items, or anything else that decides what mattered. Translation is here because
+it restates what was said; a summary makes a judgement about it, and that is not
+Konfer's judgement to make. Konfer transcribes and translates files, and stops.
 
 ## License
 

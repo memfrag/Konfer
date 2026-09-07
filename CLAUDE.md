@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Konfer is a non-sandboxed macOS 26 SwiftUI app (Xcode 26, Swift 6.2) that records
-and transcribes multi-speaker meetings entirely on device, in Swedish or English.
-Everything runs locally except the one-time model download.
+and transcribes multi-speaker meetings entirely on device, in ten languages, and
+translates them into each other. Everything runs locally except the one-time
+model download.
 
 Read `README.md` before changing the pipeline: it records the measurements behind
 the non-obvious choices (why chunking is off, why slices are capped at 4, why the
@@ -43,14 +44,18 @@ TEST_RUNNER_KONFER_AUDIO=/path/to/meeting.wav \
 
 `PipelineIntegrationTests` also reads `KONFER_BACKEND`, `KONFER_LANGUAGE`,
 `KONFER_FAST` and `KONFER_LIBRARY=real`; `RecordingSourceTests` needs
-`KONFER_RECORD_APP`. Keep test parallelization off — two runner processes sharing
-one model cache corrupt each other's download.
+`KONFER_RECORD_APP`; `TranslationAvailabilityTests` needs
+`KONFER_TRANSLATION=real` and Apple's language packs — it is the one suite that
+checks the recorded pair table against what macOS actually reports. Keep test
+parallelization off — two runner processes sharing one model cache corrupt each
+other's download.
 
 Runtime overrides for experiments: `KONFER_BACKEND` (forces a model, including
 the otherwise unreachable `kb-whisper-small`), `KONFER_CHUNKING=vad`,
 `KONFER_SLICES=1`,
 `KONFER_WHISPER_VERBOSE=1`, `KONFER_VAD_PADDING`, `KONFER_RECORD_DIAGNOSTICS=1`,
-and `APP_ENVIRONMENT=mock` to launch against `AppEnvironment.mock()`.
+`KONFER_TRANSLATE_CHUNK` (how many translated lines are written through at a
+time), and `APP_ENVIRONMENT=mock` to launch against `AppEnvironment.mock()`.
 
 `scripts/supported-locales.swift` (`swift scripts/supported-locales.swift`) lists
 the locales Apple's `SpeechTranscriber` supports on this machine and which have
@@ -157,6 +162,34 @@ because macOS installs those itself.
 Settings ▸ Models calls `unloadAll()` before deleting model files from disk.
 Long recordings are cut into at most 4 coarse slices at real silences and
 transcribed concurrently — WhisperKit's own chunking is deliberately off.
+
+**Translation** (`All Platforms/Translation/`). Not a fourth pipeline stage:
+an action on a finished transcript, because at a measured 0.34 s per turn a
+meeting costs about two minutes — cheap enough to run twice, far too slow to
+run unasked. `TranscriptTranslator` is an actor around Apple's
+`TranslationSession`, which is a class and not `Sendable`, so it is made, used
+and released inside the actor. `TranslationQueue` sits in front of it in
+`AppEnvironment` beside `VideoExportQueue`, with its translator injected
+(`Translator`) so the state machine is testable without a language pack — the
+same bargain `ModelDownloadQueue.Fetcher` makes. Unlike the video queue it
+writes lines through *as they arrive*, because half a translation is genuinely
+half a translation: the pane shows the original for every turn that has none.
+
+The models are macOS's, not Konfer's, so they are deliberately **not** in
+`ManagedModel` or Settings ▸ Models — the same position as Apple's speech
+locales. A headless session reports `canRequestDownloads == false`, so
+`TranslationDownloadPrompt` is an empty SwiftUI view whose `.translationTask`
+exists only to call `prepareTranslation()` and raise the system's download
+sheet. Its closure must be `@Sendable`, or default-`MainActor` isolation makes
+it receive a non-`Sendable` session across an isolation boundary.
+
+`Meeting.translation` keys lines by utterance id, and **every operation in
+`Meeting+Editing.swift` that rewrites a turn's text or folds two turns together
+must drop the affected lines** — `splitUtterance` is the trap, since the head
+keeps the original id while its text changes. `TranslationSupport` records the
+four pairs macOS refuses (sv↔pl, da↔pl); they are refused rather than pivoted
+through English. `SubtitleExporter.redistribute` spreads a translated turn
+across the cues its original was cut into, so no time is ever invented.
 
 **Persistence.** `MeetingStore` is one JSON file per meeting under
 `~/Library/Application Support/Konfer/Meetings/`, write-through on every
