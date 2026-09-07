@@ -35,6 +35,7 @@ struct UtteranceRow: View {
     /// Splits this turn before the word at the given index.
     let onSplitBefore: (Int) -> Void
     let onMerge: (MergeDirection) -> Void
+    let onDelete: () -> Void
 
     @State private var isEditing = false
     @State private var draft = ""
@@ -278,6 +279,8 @@ struct UtteranceRow: View {
             draft = utterance.text
             isEditing = true
         }
+
+        Button("Delete Line", role: .destructive, action: onDelete)
 
         if !otherSpeakers.isEmpty {
             reassignMenu

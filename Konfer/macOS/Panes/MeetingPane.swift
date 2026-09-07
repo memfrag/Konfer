@@ -342,6 +342,11 @@ struct MeetingPane: View {
                             meetingStore.modify(meetingID) {
                                 $0.mergeUtterance(utterance.id, with: direction)
                             }
+                        },
+                        onDelete: {
+                            meetingStore.modify(meetingID) {
+                                $0.removeUtterance(utterance.id)
+                            }
                         }
                     )
                     .id(utterance.id)

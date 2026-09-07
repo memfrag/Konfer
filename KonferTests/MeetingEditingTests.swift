@@ -248,6 +248,38 @@ struct MeetingEditingTests {
         #expect(meeting.utterances[0].words?.count == original.words?.count)
     }
 
+    // MARK: - Deleting
+
+    @Test("Deleting a line removes it and leaves the rest in order")
+    func deleteRemovesOnlyThatLine() {
+        var meeting = makeMeeting()
+        let doomed = meeting.utterances[0].id
+
+        meeting.removeUtterance(doomed)
+
+        #expect(meeting.utterances.count == 1)
+        #expect(meeting.utterances[0].text == "Good morning.")
+    }
+
+    @Test("Deleting someone's last line leaves them on the roster")
+    func deleteKeepsTheSpeaker() {
+        var meeting = makeMeeting()
+        meeting.removeUtterance(meeting.utterances[0].id)
+
+        // Speaker A said nothing else, but their embedding is the only way to
+        // attribute another line back to them.
+        #expect(meeting.speaker("A") != nil)
+        #expect(meeting.speaker("A")?.embedding == [1, 0])
+    }
+
+    @Test("Deleting a line that isn't there changes nothing")
+    func deleteUnknownIsANoOp() {
+        var meeting = makeMeeting()
+        meeting.removeUtterance(UUID())
+
+        #expect(meeting.utterances.count == 2)
+    }
+
     // MARK: - Text editing
 
     @Test("Editing text drops that line's word timings and marks it edited")

@@ -83,6 +83,21 @@ nonisolated extension Meeting {
         utterances[index].speakerId = speakerId
     }
 
+    /// Removes a turn outright.
+    ///
+    /// The one destructive operation on a transcript, and deliberately narrow:
+    /// it is for a line the recogniser invented out of a cough or a door, which
+    /// no amount of reassigning or editing turns into something worth keeping.
+    /// Trimming is the tool for "not this part of the meeting"; this is for
+    /// "this was never said".
+    ///
+    /// The speaker stays on the roster even if that was their last line, for
+    /// the same reason a merge leaves them: dropping them would throw away the
+    /// voice embedding and the ability to attribute another line to them.
+    mutating func removeUtterance(_ utteranceID: UUID) {
+        utterances.removeAll { $0.id == utteranceID }
+    }
+
     /// Splits a turn in two at a word boundary, for a speaker change the
     /// diarizer missed mid-sentence.
     ///
