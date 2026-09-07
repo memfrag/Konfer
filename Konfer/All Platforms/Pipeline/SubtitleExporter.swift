@@ -65,13 +65,14 @@ nonisolated enum SubtitleExporter {
     ///   WebVTT the name is a tag rather than text and this is false.
     static func cues(
         for meeting: Meeting,
-        attributionTakesRoom: Bool = false
+        attributionTakesRoom: Bool = false,
+        rendering: TranscriptRendering = .original
     ) -> [SubtitleCue] {
         meeting.keptUtterances.flatMap { utterance in
             let speaker = meeting.displayName(for: utterance.speakerId)
             let reserved = attributionTakesRoom ? attribution(for: speaker).count : 0
 
-            return split(utterance, firstCueBudget: maximumCharacters - reserved)
+            let source = split(utterance, firstCueBudget: maximumCharacters - reserved)
                 .enumerated()
                 .map { index, piece in
                     SubtitleCue(
@@ -83,7 +84,100 @@ nonisolated enum SubtitleExporter {
                         text: piece.text
                     )
                 }
+
+            guard rendering == .translated,
+                  let translated = meeting.translatedText(for: utterance)
+            else {
+                // A turn with no translation goes out in the original
+                // language. Mixed subtitles beat blank ones, and the reader
+                // can see for themselves which lines were left behind.
+                return source
+            }
+            return redistribute(translated, across: source)
         }
+    }
+
+    /// Spreads one turn's translated text across the cues its original was cut
+    /// into.
+    ///
+    /// Translated text has no word timings — the model timed the words that
+    /// were said, and these are not those. ``split(_:firstCueBudget:)`` refuses
+    /// to cut an un-timed turn on the grounds that it would have to invent the
+    /// times to cut at, and that stands: this invents none. Every start and end
+    /// here is a time the recogniser produced for the source. The only thing
+    /// chosen is where in the translated sentence to break, which is a claim
+    /// about the text and not about the recording.
+    ///
+    /// Each cue is given words until it has had its share of the translation,
+    /// its share being the share of the turn's source characters it carried.
+    /// Rejoined, the pieces are exactly the translation: nothing is dropped to
+    /// make it fit, because a subtitle that silently loses a clause is worse
+    /// than one that runs long, and ``wrapped(_:)`` already folds the surplus.
+    ///
+    /// A cue that would be left with no words at all — the translation is
+    /// shorter than the original, which English against German is routinely —
+    /// is folded into the next one that has some. The result spans both, which
+    /// is still two real times and one fewer subtitle, rather than a blank
+    /// flashing by.
+    static func redistribute(_ translated: String, across cues: [SubtitleCue]) -> [SubtitleCue] {
+        let words = translated.split(separator: " ", omittingEmptySubsequences: true)
+        guard cues.count > 1, !words.isEmpty else {
+            guard let only = cues.first else { return [] }
+            return [SubtitleCue(
+                start: only.start,
+                end: cues[cues.count - 1].end,
+                speaker: only.speaker,
+                text: words.isEmpty ? only.text : words.joined(separator: " ")
+            )]
+        }
+
+        // How far into the translation each cue's share reaches, measured in
+        // characters so a cue carrying a long sentence gets proportionally
+        // more of the translation than one carrying three words.
+        let sourceTotal = Double(cues.reduce(0) { $0 + $1.text.count })
+        let translatedTotal = Double(words.reduce(0) { $0 + $1.count + 1 })
+        var reach: [Double] = []
+        var running = 0.0
+        for cue in cues {
+            running += Double(cue.text.count)
+            reach.append(sourceTotal > 0 ? running / sourceTotal * translatedTotal : translatedTotal)
+        }
+
+        var pieces: [[Substring]] = Array(repeating: [], count: cues.count)
+        var index = 0
+        var consumed = 0.0
+        for word in words {
+            while index < cues.count - 1, consumed >= reach[index] { index += 1 }
+            pieces[index].append(word)
+            consumed += Double(word.count) + 1
+        }
+
+        var out: [SubtitleCue] = []
+        var groupStart = 0
+        for index in cues.indices where !pieces[index].isEmpty {
+            out.append(SubtitleCue(
+                start: cues[groupStart].start,
+                end: cues[index].end,
+                // Only the first cue of a turn carries the name, and only the
+                // first group can begin at the turn's first cue.
+                speaker: cues[groupStart].speaker,
+                text: pieces[index].joined(separator: " ")
+            ))
+            groupStart = index + 1
+        }
+
+        // Words ran out before the cues did. The last cue keeps the turn's own
+        // end rather than stopping early and leaving a silent gap.
+        if groupStart < cues.count, let last = out.popLast() {
+            out.append(SubtitleCue(
+                start: last.start,
+                end: cues[cues.count - 1].end,
+                speaker: last.speaker,
+                text: last.text
+            ))
+        }
+
+        return out
     }
 
     /// How a speaker is written in front of their words.
@@ -183,10 +277,13 @@ nonisolated enum SubtitleExporter {
 
     // MARK: - WebVTT
 
-    static func webVTT(for meeting: Meeting) -> String {
+    static func webVTT(
+        for meeting: Meeting,
+        rendering: TranscriptRendering = .original
+    ) -> String {
         var out = "WEBVTT\n"
 
-        for (index, cue) in cues(for: meeting).enumerated() {
+        for (index, cue) in cues(for: meeting, rendering: rendering).enumerated() {
             out += "\n\(index + 1)\n"
             out += "\(Timecode.subtitle(cue.start, decimalSeparator: "."))"
             out += " --> "
@@ -221,10 +318,14 @@ nonisolated enum SubtitleExporter {
 
     // MARK: - SubRip
 
-    static func srt(for meeting: Meeting) -> String {
+    static func srt(
+        for meeting: Meeting,
+        rendering: TranscriptRendering = .original
+    ) -> String {
         var out = ""
 
-        for (index, cue) in cues(for: meeting, attributionTakesRoom: true).enumerated() {
+        let all = cues(for: meeting, attributionTakesRoom: true, rendering: rendering)
+        for (index, cue) in all.enumerated() {
             if index > 0 { out += "\n" }
             out += "\(index + 1)\n"
             out += "\(Timecode.subtitle(cue.start, decimalSeparator: ","))"
