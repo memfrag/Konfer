@@ -86,8 +86,19 @@ nonisolated enum SubtitleExporter {
         }
     }
 
-    /// How SubRip writes a speaker in front of their words.
+    /// How a speaker is written in front of their words.
     static func attribution(for speaker: String) -> String { "\(speaker): " }
+
+    /// A cue as it appears on screen: the name in front of the words when this
+    /// is the first cue of a turn, wrapped to the line width.
+    ///
+    /// Shared by SubRip and by the tx3g track embedded in a video, which both
+    /// put the name on the line as plain text rather than in markup. WebVTT
+    /// does not use it — there the name is a `<v>` tag taking no room.
+    static func displayText(for cue: SubtitleCue) -> String {
+        guard let speaker = cue.speaker else { return wrapped(cue.text) }
+        return wrapped(attribution(for: speaker) + cue.text)
+    }
 
     private struct Piece {
         let start: TimeInterval
@@ -223,11 +234,7 @@ nonisolated enum SubtitleExporter {
             // SubRip has no markup and no voice tag, so the name goes in front
             // of the words the way a script writes it — and is wrapped with
             // them, since on screen it is simply more text on the line.
-            if let speaker = cue.speaker {
-                out += "\(wrapped(attribution(for: speaker) + cue.text))\n"
-            } else {
-                out += "\(wrapped(cue.text))\n"
-            }
+            out += "\(displayText(for: cue))\n"
         }
 
         return out
