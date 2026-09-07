@@ -2,6 +2,7 @@
 //  Copyright © 2026 Martin Johannesson. All rights reserved.
 //
 
+import AppKit
 import SwiftUI
 
 /// Shows what the pipeline is doing, or the last thing that went wrong.
@@ -12,14 +13,20 @@ import SwiftUI
 struct SidebarFooter: View {
 
     @Environment(TranscriptionPipeline.self) private var pipeline
+    @Environment(VideoExportQueue.self) private var videoExports
 
     var body: some View {
         Group {
+            // The pipeline first: it is the longer wait and the one the app
+            // exists for. A video export is happy to wait its turn to be shown.
             if let error = pipeline.lastError {
                 errorFooter(error)
                     .footerChrome()
             } else if let job = pipeline.activeJob {
                 progressFooter(job)
+                    .footerChrome()
+            } else if videoExports.state != .idle {
+                exportFooter()
                     .footerChrome()
             }
         }
@@ -75,6 +82,83 @@ struct SidebarFooter: View {
             .font(.caption2)
             .foregroundStyle(.secondary)
         }
+    }
+
+    // MARK: - Video export
+
+    /// Copying an hour of screen recording takes minutes, so it reports the
+    /// same way transcribing does rather than happening invisibly.
+    @ViewBuilder private func exportFooter() -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            switch videoExports.state {
+            case .exporting(let fraction):
+                HStack {
+                    Text(videoExports.title ?? "Exporting video")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    Spacer()
+                    Button {
+                        videoExports.cancel()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Stop exporting")
+                }
+
+                ProgressView(value: fraction)
+                    .controlSize(.small)
+
+                HStack(spacing: 4) {
+                    Text("Writing subtitled video")
+                    if fraction > 0 { Text("\(Int(fraction * 100))%") }
+                    Spacer()
+                    if let startedAt = videoExports.startedAt {
+                        Text(timerInterval: startedAt...Date.distantFuture, countsDown: false)
+                            .monospacedDigit()
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            case .finished(let url):
+                Label {
+                    Text("Exported \(url.lastPathComponent)")
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+                HStack {
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
+                    .controlSize(.small)
+                    Button("Dismiss") { videoExports.acknowledge() }
+                        .controlSize(.small)
+                }
+
+            case .failed(let message):
+                Label {
+                    Text(message)
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+                Button("Dismiss") { videoExports.acknowledge() }
+                    .controlSize(.small)
+
+            case .idle:
+                EmptyView()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Error

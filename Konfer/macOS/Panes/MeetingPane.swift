@@ -2,6 +2,7 @@
 //  Copyright © 2026 Martin Johannesson. All rights reserved.
 //
 
+import AppKit
 import AVFoundation
 import SwiftUI
 import UniformTypeIdentifiers
@@ -14,6 +15,7 @@ struct MeetingPane: View {
     @Environment(MeetingStore.self) private var meetingStore
     @Environment(SpeakerStore.self) private var speakerStore
     @Environment(TranscriptionPipeline.self) private var pipeline
+    @Environment(VideoExportQueue.self) private var videoExports
 
     @State private var player = PlayerController()
     @State private var waveform: Waveform?
@@ -32,6 +34,11 @@ struct MeetingPane: View {
     /// gone — this is how you look at it.
     @State private var isShowingTrimmed = false
 
+    /// Whether this meeting's recording has a picture. Probed once when the
+    /// pane appears — `Meeting` stores only a path, so there is nothing to
+    /// read it from.
+    @State private var hasVideo = false
+
     private var meeting: Meeting? { meetingStore.meeting(meetingID) }
 
     var body: some View {
@@ -45,6 +52,7 @@ struct MeetingPane: View {
         .navigationTitle(meeting?.title ?? "Transcript")
         .navigationSubtitle(meeting.map { Timecode.short($0.duration) } ?? "")
         .onAppear { loadAudio() }
+        .task(id: meetingID) { await probeForVideo() }
         .task(id: meetingID) { await loadWaveform() }
         .onDisappear { player.unload() }
         .focusedSceneValue(\.exportableMeeting, exportable)
@@ -464,6 +472,15 @@ struct MeetingPane: View {
         }
     }
 
+    /// Whether the recording has a picture, which is what a subtitle track
+    /// needs to sit on. The same track test `AudioSourcePreparer` uses.
+    private func probeForVideo() async {
+        hasVideo = false
+        guard let meeting, meeting.audioExists else { return }
+        let asset = AVURLAsset(url: meeting.audioURL)
+        hasVideo = ((try? await asset.loadTracks(withMediaType: .video)) ?? []).isEmpty == false
+    }
+
     private func loadAudio() {
         guard let meeting, meeting.audioExists else { return }
         player.load(meeting.audioURL)
@@ -515,15 +532,61 @@ struct MeetingPane: View {
     // MARK: - Export
 
     private var exportable: ExportableMeeting? {
-        guard meeting != nil else { return nil }
-        return ExportableMeeting(id: meetingID) { format in
-            export(format)
-        }
+        guard let meeting else { return nil }
+        return ExportableMeeting(
+            id: meetingID,
+            export: { export($0) },
+            exportVideo: { exportVideo() },
+            canExportVideo: hasVideo
+                && meeting.audioExists
+                && !videoExports.state.isExporting
+        )
     }
 
     private var exportFilename: String {
         guard let meeting, let exportFormat else { return "Transcript" }
         return "\(meeting.title).\(exportFormat.fileExtension)"
+    }
+
+    /// Asks where to put the copy, then hands the work to the queue.
+    ///
+    /// `NSSavePanel` rather than SwiftUI's `fileExporter`, for two reasons: a
+    /// `FileDocument` renders to `Data` up front, which is right for a
+    /// transcript and impossible for a gigabyte of video, and only a panel can
+    /// carry the trim checkbox.
+    private func exportVideo() {
+        guard let meeting else { return }
+
+        let panel = NSSavePanel()
+        panel.title = "Export Video with Subtitles"
+        panel.nameFieldStringValue =
+            "\(meeting.title) with subtitles.\(meeting.audioURL.pathExtension)"
+        panel.canCreateDirectories = true
+
+        // Only worth asking when there is a trim to apply.
+        var trimBox: NSButton?
+        if let kept = meeting.keptRange {
+            let box = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+            box.title = "Trim video to "
+                + "\(Timecode.short(kept.start))–\(Timecode.short(kept.end))"
+            box.state = .on
+            box.sizeToFit()
+            box.setFrameOrigin(NSPoint(x: 20, y: 8))
+
+            let accessory = NSView(frame: NSRect(
+                x: 0, y: 0, width: box.frame.width + 40, height: box.frame.height + 16
+            ))
+            accessory.addSubview(box)
+            panel.accessoryView = accessory
+            trimBox = box
+        }
+
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        videoExports.export(
+            meeting,
+            to: destination,
+            trimmed: trimBox?.state == .on
+        )
     }
 
     private func export(_ format: TranscriptExporter.Format) {

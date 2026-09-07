@@ -19,6 +19,15 @@ struct ExportCommands: Commands {
                     .disabled(meeting == nil)
                 }
             }
+            // Not one of the formats above: those render a transcript to data
+            // in memory, and this copies a recording. Sidecar subtitles are for
+            // players that read them; this is for QuickTime, which doesn't.
+            Section {
+                Button("Export Video with Subtitles…") {
+                    meeting?.exportVideo()
+                }
+                .disabled(meeting?.canExportVideo != true)
+            }
         }
     }
 }
@@ -30,6 +39,13 @@ struct ExportableMeeting: Equatable {
 
     let id: UUID
     let export: @MainActor (TranscriptExporter.Format) -> Void
+
+    /// Writes a copy of the recording with the subtitles inside it.
+    let exportVideo: @MainActor () -> Void
+
+    /// False for an audio-only meeting, and for one whose recording has moved.
+    /// Subtitles need a picture to sit on.
+    let canExportVideo: Bool
 
     func callAsFunction(_ format: TranscriptExporter.Format) {
         export(format)
