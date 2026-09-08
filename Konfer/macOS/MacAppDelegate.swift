@@ -17,14 +17,48 @@ class MacAppDelegate: NSObject, NSApplicationDelegate {
     /// is restartable partway — so quitting mid-run throws the work away.
     static var isTranscribing = false
 
+    /// True while the quit alert is on screen.
+    ///
+    /// `runModal()` spins the run loop, so a second termination request can
+    /// arrive while the first is still being answered. Without this it would
+    /// put a second alert on top of the first.
+    private var isAskingWhetherToQuit = false
+
+    /// Whether closing the last window should quit the app.
+    ///
+    /// Not while a transcription is running, and the reason is a loop rather
+    /// than a preference. Closing the main window mid-run used to start a
+    /// termination the alert then cancelled — at which point the *alert's own
+    /// window* closed, and with the main window already gone that was again
+    /// the last window closing, so AppKit asked again, and again. The app
+    /// never came back either, because cancelling a termination does not
+    /// reopen the window that started it.
+    ///
+    /// So closing the window during a run simply leaves the run going, which
+    /// is what the alert's "Keep Transcribing" was asking for anyway. The Dock
+    /// icon brings the window back, and ⌘Q still asks before discarding.
+    static func terminatesAfterLastWindowClosed(
+        hasShownMainWindow: Bool,
+        isTranscribing: Bool
+    ) -> Bool {
+        hasShownMainWindow && !isTranscribing
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        Self.shouldTerminateAppAfterLastWindowClosed
+        Self.terminatesAfterLastWindowClosed(
+            hasShownMainWindow: Self.shouldTerminateAppAfterLastWindowClosed,
+            isTranscribing: Self.isTranscribing
+        )
     }
 
     func applicationShouldTerminate(
         _ sender: NSApplication
     ) -> NSApplication.TerminateReply {
         guard Self.isTranscribing else { return .terminateNow }
+        guard !isAskingWhetherToQuit else { return .terminateCancel }
+
+        isAskingWhetherToQuit = true
+        defer { isAskingWhetherToQuit = false }
 
         let alert = NSAlert()
         alert.messageText = "Transcription in progress"
