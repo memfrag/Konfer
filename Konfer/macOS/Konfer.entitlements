@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Required to reach the microphone under the Hardened Runtime, which
+	     notarized builds are signed with. Without it the release build is
+	     refused the microphone before macOS ever asks the user, so no entry
+	     ever appears in Privacy & Security ▸ Microphone. Debug builds are
+	     not hardened, which is why this only ever broke for other people. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>
