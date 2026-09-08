@@ -595,13 +595,11 @@ struct MeetingPane: View {
 
     private var exportFilename: String {
         guard let meeting, let exportFormat else { return "Transcript" }
-        // The language in the name, so two exports of one meeting don't
-        // overwrite each other and neither has to be opened to tell which is
-        // which.
-        guard exportRendering == .translated, let target = meeting.translationTarget else {
-            return "\(meeting.title).\(exportFormat.fileExtension)"
-        }
-        return "\(meeting.title) (\(target.displayName)).\(exportFormat.fileExtension)"
+        // Shared with the sidebar's own export, so the same transcript saved
+        // from either place lands under the same name.
+        return MeetingExport.filename(
+            for: meeting, format: exportFormat, rendering: exportRendering
+        )
     }
 
     /// Asks where to put the copy, then hands the work to the queue.

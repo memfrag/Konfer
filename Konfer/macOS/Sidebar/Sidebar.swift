@@ -100,6 +100,34 @@ struct Sidebar: View {
         }
     }
 
+    /// Export without opening the meeting first.
+    ///
+    /// Flat rather than a submenu per language: two levels is already as deep
+    /// as a context menu should go, and naming the language on the item says
+    /// which is which without opening anything further. Video export is not
+    /// here — knowing whether a recording has a picture means reading the
+    /// file, which is a probe per row the list would have to make for every
+    /// meeting to draw one menu.
+    @ViewBuilder
+    private func exportMenu(for meeting: Meeting) -> some View {
+        Menu("Export") {
+            ForEach(TranscriptExporter.Format.allCases) { format in
+                Button("\(format.displayName)…") {
+                    MeetingExport.save(meeting, format: format)
+                }
+            }
+
+            if let target = meeting.translationTarget {
+                Divider()
+                ForEach(TranscriptExporter.Format.allCases.filter(\.hasTranslatedVariant)) { format in
+                    Button("\(format.displayName) (\(target.displayName))…") {
+                        MeetingExport.save(meeting, format: format, rendering: .translated)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Sidebar
 
     private var sidebarList: some View {
@@ -125,6 +153,10 @@ struct Sidebar: View {
                                 NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
                             }
                             .disabled(!meeting.audioExists)
+
+                            Divider()
+
+                            exportMenu(for: meeting)
 
                             Divider()
 
