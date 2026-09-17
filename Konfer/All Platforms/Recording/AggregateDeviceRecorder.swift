@@ -38,16 +38,12 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var writer: TwoChannelWriter?
 
-    /// When false the microphone's channel is captured and then dropped rather
-    /// than not captured at all.
+    /// Whether the microphone is part of the aggregate at all.
     ///
-    /// An aggregate device needs a main sub-device to own its clock, and here
-    /// that is the microphone — so leaving it out means rebuilding the
-    /// aggregate around the default *output* device, whose only input channel
-    /// would be the mono tap. Until that is done and measured against a real
-    /// tap, "no microphone" means the file's channel 0 is silent, not that
-    /// macOS was never asked for the microphone. ``ScreenCaptureRecorder``
-    /// does avoid the permission, because a stream simply omits the output.
+    /// When it is not, the device is built around the default *output* device
+    /// instead — see `prepare`. Nothing then opens an input device, so macOS
+    /// never asks for the microphone permission for a recording that was only
+    /// ever going to hold the other side.
     private var recordsMicrophone = true
 
     /// Channels the aggregate device gives us. The microphone's come first and
@@ -77,7 +73,7 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
             throw RecordingError.noAudioDevice
         }
         recordsMicrophone = configuration.recordsMicrophone
-        if !AudioInputDevices.isAuthorized {
+        if recordsMicrophone, !AudioInputDevices.isAuthorized {
             guard await AudioInputDevices.requestAccess() else {
                 throw RecordingError.microphoneAccessDenied
             }
@@ -104,17 +100,24 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
             throw RecordingError.tapCreationFailed(status)
         }
 
-        let microphoneUID = configuration.microphoneID ?? Self.defaultInputUID()
-        guard let microphoneUID else { throw RecordingError.noAudioDevice }
+        // An aggregate device needs a main sub-device to own its clock, and a
+        // tap is not one. With the microphone in the recording that is the
+        // microphone; without it, the default output device stands in — it
+        // contributes no *input* channels, so the aggregate's only input
+        // channel is the mono tap, and no input device is ever opened.
+        let clockUID = recordsMicrophone
+            ? configuration.microphoneID ?? Self.defaultInputUID()
+            : Self.defaultDeviceUID(kAudioHardwarePropertyDefaultOutputDevice)
+        guard let clockUID else { throw RecordingError.noAudioDevice }
 
         let description: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Konfer Recording",
             kAudioAggregateDeviceUIDKey: "pizza.martin.Konfer.aggregate.\(UUID().uuidString)",
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,
-            kAudioAggregateDeviceMainSubDeviceKey: microphoneUID,
+            kAudioAggregateDeviceMainSubDeviceKey: clockUID,
             kAudioAggregateDeviceSubDeviceListKey: [
-                [kAudioSubDeviceUIDKey: microphoneUID]
+                [kAudioSubDeviceUIDKey: clockUID]
             ],
             kAudioAggregateDeviceTapListKey: [
                 [
@@ -130,7 +133,9 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
             throw RecordingError.aggregateDeviceFailed(status)
         }
 
-        channelCount = max(2, Self.inputChannelCount(of: aggregateID))
+        // Floor of one without the microphone: a tap-only aggregate is
+        // expected to expose exactly the mono tap.
+        channelCount = max(recordsMicrophone ? 2 : 1, Self.inputChannelCount(of: aggregateID))
         try setUpAudioUnit()
     }
 
@@ -267,8 +272,13 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
                 Array(UnsafeBufferPointer(start: channelBuffers[0], count: count))
             )
         }
+        // The tap is the last channel: after the microphone's when there is
+        // one, and the only channel when there is not. With the microphone on,
+        // a single-channel aggregate means the tap never made it in — sending
+        // channel 0 as system audio would then copy the microphone onto both
+        // sides of the file.
         let tapChannel = channelCount - 1
-        if tapChannel > 0 {
+        if !recordsMicrophone || tapChannel > 0 {
             writer.appendSystemAudio(
                 Array(UnsafeBufferPointer(start: channelBuffers[tapChannel], count: count))
             )
@@ -359,8 +369,17 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
 
     /// UID of the system's default input, used when no microphone was chosen.
     private static func defaultInputUID() -> String? {
+        defaultDeviceUID(kAudioHardwarePropertyDefaultInputDevice)
+    }
+
+    /// UID of one of the system's default devices.
+    ///
+    /// - Parameter selector: `kAudioHardwarePropertyDefaultInputDevice` for the
+    ///   microphone side, `…DefaultOutputDevice` for the device that owns the
+    ///   clock of a tap-only aggregate.
+    private static func defaultDeviceUID(_ selector: AudioObjectPropertySelector) -> String? {
         var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mSelector: selector,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )

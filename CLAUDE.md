@@ -241,12 +241,15 @@ you are only listening to is recorded with channel 0 deliberately silent, which
 so the transcript marks every voice as being on the call. Off is a flag rather
 than a nil `microphoneID`, because nil there already means the system default
 — and `RecorderController.refreshDevices()` reassigns a nil id every couple of
-seconds. `ScreenCaptureRecorder` genuinely leaves the microphone out, so that
-mode never asks for the microphone permission; `AggregateDeviceRecorder` still
-captures channel 0 and discards it, because the aggregate device's clock is
-owned by the microphone as its main sub-device — making that permission-free
-means rebuilding the aggregate around the default *output* device, whose only
-input channel would be the mono tap.
+seconds. Neither recorder opens an input device in that mode, so neither asks for the
+microphone permission. `ScreenCaptureRecorder` simply omits the `.microphone`
+stream output. `AggregateDeviceRecorder` cannot omit its microphone so easily —
+an aggregate device needs a main sub-device to own its clock and a tap is not
+one — so it builds the device around the default *output* device instead, which
+contributes no input channels: measured against a real tap, the aggregate then
+exposes one input stream of one channel (the mono tap) rather than two, and
+channel 0 reads digital zero. That is why the "microphone first, tap last"
+assumption in `render` and the channel-count floor are both conditional.
 
 **UI.** `MacApp` registers the scenes (main, recorder, models, welcome,
 settings, about, attributions, help). `WelcomeWindow` opens once from

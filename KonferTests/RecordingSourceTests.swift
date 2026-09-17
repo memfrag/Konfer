@@ -72,6 +72,57 @@ struct RecordingSourceTests {
         #expect(levels.right > 0.001, "no audio captured from \(application.name)")
     }
 
+    @Test(
+        "With the microphone off, the tap is the only channel the aggregate has",
+        .enabled(if: RecordingSourceTests.targetApplication != nil),
+        .timeLimit(.minutes(1))
+    )
+    func recordsApplicationAudioWithoutTheMicrophone() async throws {
+        let name = try #require(Self.targetApplication)
+        let application = try #require(
+            AudioApplications.playingAudio()
+                .first { $0.name.localizedCaseInsensitiveContains(name) },
+            "\(name) isn't playing audio — start playback first"
+        )
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("konfer-tap-nomic-\(UUID().uuidString).m4a")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let recorder = AggregateDeviceRecorder()
+        let writer = try TwoChannelWriter(url: url)
+        // What the recorder itself does for this mode: the microphone side is
+        // declared silent, so it never holds the writer up.
+        writer.markSilent(.microphone)
+
+        try await recorder.prepare(
+            RecordingConfiguration(
+                microphoneID: AudioInputDevices.available().first?.id,
+                recordsMicrophone: false,
+                systemAudio: .app(application),
+                outputURL: url
+            )
+        )
+        try await recorder.start(writingTo: writer)
+        try await Task.sleep(for: .seconds(5))
+        await recorder.stop()
+        writer.finish()
+
+        let levels = try Self.channelLevels(of: url)
+        print(String(
+            format: "  left(mic, off) peak %.4f   right(%@) peak %.4f",
+            levels.left, application.name, levels.right
+        ))
+
+        // The aggregate is built around the default output device here, so a
+        // microphone id being passed in must make no difference: the tap is the
+        // only input channel, and it has to arrive on the right.
+        #expect(levels.right > 0.001, "no audio captured from \(application.name)")
+        // Digital zero, not merely quiet. Anything above this means channel 0
+        // was captured after all — the aggregate opened an input device.
+        #expect(levels.left == 0, "the microphone was recorded despite being off")
+    }
+
     /// Peak level of each channel of a recording.
     nonisolated static func channelLevels(of url: URL) throws -> (left: Float, right: Float) {
         let file = try AVAudioFile(forReading: url)
