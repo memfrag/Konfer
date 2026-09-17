@@ -6,11 +6,16 @@ import AVFoundation
 import Foundation
 import ScreenCaptureKit
 
-/// Records the microphone together with everything the Mac plays.
+/// Records everything the Mac plays, with or without the microphone.
 ///
 /// ScreenCaptureKit hands both sides over from a single stream — system audio
 /// as `.audio` buffers and the microphone as `.microphone` ones — so they share
 /// a clock without any work on our part.
+///
+/// With the microphone off it is the stream that leaves it out, not us: no
+/// `.microphone` output is asked for, so macOS never opens an input device and
+/// never asks for the microphone permission. Recording a call you are only
+/// listening to therefore needs one permission rather than two.
 ///
 /// The cost is the full screen-recording permission, whose wording is alarming
 /// for an audio recorder, and that it picks up every other sound the machine
@@ -26,7 +31,7 @@ nonisolated final class ScreenCaptureRecorder: NSObject, RecordingSource, @unche
     // MARK: - RecordingSource
 
     func prepare(_ configuration: RecordingConfiguration) async throws {
-        if !AudioInputDevices.isAuthorized {
+        if configuration.recordsMicrophone, !AudioInputDevices.isAuthorized {
             guard await AudioInputDevices.requestAccess() else {
                 throw RecordingError.microphoneAccessDenied
             }
@@ -58,8 +63,10 @@ nonisolated final class ScreenCaptureRecorder: NSObject, RecordingSource, @unche
 
         let streamConfiguration = SCStreamConfiguration()
         streamConfiguration.capturesAudio = true
-        streamConfiguration.captureMicrophone = true
-        streamConfiguration.microphoneCaptureDeviceID = configuration.microphoneID
+        streamConfiguration.captureMicrophone = configuration.recordsMicrophone
+        if configuration.recordsMicrophone {
+            streamConfiguration.microphoneCaptureDeviceID = configuration.microphoneID
+        }
         // Without this, Konfer playing back a transcript would record itself.
         streamConfiguration.excludesCurrentProcessAudio = true
         streamConfiguration.sampleRate = Int(TwoChannelWriter.sampleRate)
@@ -73,7 +80,11 @@ nonisolated final class ScreenCaptureRecorder: NSObject, RecordingSource, @unche
         let filter = SCContentFilter(display: display, excludingWindows: [])
         let stream = SCStream(filter: filter, configuration: streamConfiguration, delegate: nil)
         try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: .global(qos: .userInitiated))
-        try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: .global(qos: .userInitiated))
+        if configuration.recordsMicrophone {
+            try stream.addStreamOutput(
+                self, type: .microphone, sampleHandlerQueue: .global(qos: .userInitiated)
+            )
+        }
         try await stream.startCapture()
         self.stream = stream
     }

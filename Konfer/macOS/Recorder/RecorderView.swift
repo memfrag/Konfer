@@ -74,10 +74,12 @@ struct RecorderView: View {
                 }
                 TextField("Name", text: $controller.filename)
 
-                Picker("Microphone", selection: $controller.microphoneID) {
+                Picker("Microphone", selection: microphoneBinding) {
                     ForEach(controller.microphones) { device in
                         Text(device.name).tag(Optional(device.id))
                     }
+                    Divider()
+                    Text("Off — the other side only").tag(String?.none)
                 }
 
                 Picker("Also record", selection: systemAudioBinding) {
@@ -93,13 +95,9 @@ struct RecorderView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } footer: {
-                Text(
-                    "Your microphone is recorded on the left channel and the other "
-                    + "side on the right, so the two can be told apart later. "
-                    + "About 350 MB an hour."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(channelExplanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -134,17 +132,55 @@ struct RecorderView: View {
         )
     }
 
+    /// The microphone picker's selection, where nil is "Off".
+    ///
+    /// Off is a flag of its own rather than a nil device id: `refreshDevices()`
+    /// reassigns a nil id to the first attached microphone every couple of
+    /// seconds, so a picker where nil meant off would switch itself back on
+    /// while the user was still setting up. The chosen device is also kept
+    /// while off, so turning the microphone back on returns to it.
+    private var microphoneBinding: Binding<String?> {
+        Binding(
+            get: { controller.recordsMicrophone ? controller.microphoneID : nil },
+            set: { selection in
+                controller.recordsMicrophone = selection != nil
+                if let selection { controller.microphoneID = selection }
+            }
+        )
+    }
+
     private var systemAudioExplanation: String {
-        switch controller.systemAudio {
+        guard !controller.hasNothingToRecord else {
+            return "With the microphone off and nothing else chosen, there is "
+                + "nothing to record."
+        }
+        return switch controller.systemAudio {
         case .none:
             "Only you will be recorded."
         case .app(let app):
-            "Only \(app.name) is recorded, so notifications and music stay out. "
-            + "macOS asks to allow system-audio recording the first time."
+            controller.recordsMicrophone
+            ? "Only \(app.name) is recorded, so notifications and music stay out. "
+              + "macOS asks to allow system-audio recording the first time."
+            : "Only \(app.name) is recorded — not you, and not notifications or "
+              + "music. macOS asks to allow system-audio recording the first time."
         case .everything:
-            "Records every sound the Mac makes, including notifications. macOS "
-            + "asks for the full screen-recording permission the first time."
+            controller.recordsMicrophone
+            ? "Records every sound the Mac makes, including notifications. macOS "
+              + "asks for the full screen-recording permission the first time."
+            : "Records every sound the Mac makes, including notifications, but not "
+              + "you — so macOS asks only about the screen, never the microphone."
         }
+    }
+
+    /// What the two channels will hold. Worth saying, because a recording with
+    /// the microphone off is a file whose left channel is deliberately silent.
+    private var channelExplanation: String {
+        controller.recordsMicrophone
+        ? "Your microphone is recorded on the left channel and the other side on "
+          + "the right, so the two can be told apart later. About 350 MB an hour."
+        : "The other side is recorded on the right channel and the left stays "
+          + "silent, so every voice in the transcript will be marked as being on "
+          + "the call. About 350 MB an hour."
     }
 
     // MARK: - Meters
@@ -154,7 +190,8 @@ struct RecorderView: View {
             LevelMeter(
                 label: "Microphone",
                 level: controller.microphoneLevel,
-                color: .blue
+                color: .blue,
+                isActive: controller.recordsMicrophone
             )
             LevelMeter(
                 label: "Other side",
@@ -217,7 +254,7 @@ struct RecorderView: View {
                     .frame(width: 80)
                 }
                 .keyboardShortcut(.return, modifiers: [])
-                .disabled(controller.state == .preparing)
+                .disabled(controller.state == .preparing || controller.hasNothingToRecord)
                 .tint(controller.state.isRecording ? .red : .accentColor)
                 .buttonStyle(.borderedProminent)
 

@@ -9,7 +9,8 @@ import Foundation
 /// Where the system-audio side of a recording comes from.
 nonisolated enum SystemAudioSource: Hashable, Sendable {
 
-    /// Microphone only.
+    /// No second source: the microphone alone, and nothing at all if that is
+    /// off too — which ``RecordingError/nothingToRecord`` refuses.
     case none
 
     /// One application's output, via a Core Audio process tap. Notifications,
@@ -40,6 +41,14 @@ nonisolated struct RecordingConfiguration: Sendable {
 
     /// `uniqueID` of the chosen input device, or nil for the system default.
     let microphoneID: String?
+
+    /// False when the microphone is deliberately left out and only the other
+    /// side is recorded, so channel 0 comes out silent.
+    ///
+    /// Its own flag rather than a nil `microphoneID`: nil there already means
+    /// "whatever the system default is", and the chosen device has to survive
+    /// being switched off so it is still there when it is switched back on.
+    var recordsMicrophone: Bool = true
 
     let systemAudio: SystemAudioSource
 
@@ -97,6 +106,7 @@ nonisolated enum RecordingError: LocalizedError {
     case microphoneAccessDenied
     case screenRecordingAccessDenied
     case noAudioDevice
+    case nothingToRecord
     case tapCreationFailed(OSStatus)
     case aggregateDeviceFailed(OSStatus)
     case applicationNotPlayingAudio(String)
@@ -110,6 +120,8 @@ nonisolated enum RecordingError: LocalizedError {
             "Konfer isn't allowed to record the screen, which macOS also requires for system audio."
         case .noAudioDevice:
             "No audio input device is available."
+        case .nothingToRecord:
+            "Nothing is selected to record."
         case .tapCreationFailed:
             "Couldn't tap that app's audio."
         case .aggregateDeviceFailed:
@@ -131,6 +143,8 @@ nonisolated enum RecordingError: LocalizedError {
             + "that app's audio."
         case .applicationNotPlayingAudio:
             "Start the call or play something first, then begin recording."
+        case .nothingToRecord:
+            "Turn the microphone back on, choose something to record, or both."
         default:
             nil
         }

@@ -51,6 +51,7 @@ struct RecordingSourceTests {
         try await recorder.prepare(
             RecordingConfiguration(
                 microphoneID: AudioInputDevices.available().first?.id,
+                recordsMicrophone: true,
                 systemAudio: .app(application),
                 outputURL: url
             )

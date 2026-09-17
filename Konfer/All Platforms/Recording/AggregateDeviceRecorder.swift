@@ -38,6 +38,18 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var writer: TwoChannelWriter?
 
+    /// When false the microphone's channel is captured and then dropped rather
+    /// than not captured at all.
+    ///
+    /// An aggregate device needs a main sub-device to own its clock, and here
+    /// that is the microphone — so leaving it out means rebuilding the
+    /// aggregate around the default *output* device, whose only input channel
+    /// would be the mono tap. Until that is done and measured against a real
+    /// tap, "no microphone" means the file's channel 0 is silent, not that
+    /// macOS was never asked for the microphone. ``ScreenCaptureRecorder``
+    /// does avoid the permission, because a stream simply omits the output.
+    private var recordsMicrophone = true
+
     /// Channels the aggregate device gives us. The microphone's come first and
     /// the mono tap is last.
     private var channelCount = 2
@@ -64,6 +76,7 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
         guard case .app(let application) = configuration.systemAudio else {
             throw RecordingError.noAudioDevice
         }
+        recordsMicrophone = configuration.recordsMicrophone
         if !AudioInputDevices.isAuthorized {
             guard await AudioInputDevices.requestAccess() else {
                 throw RecordingError.microphoneAccessDenied
@@ -249,9 +262,11 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
         guard status == noErr else { return status }
         guard let writer else { return noErr }
 
-        writer.appendMicrophone(
-            Array(UnsafeBufferPointer(start: channelBuffers[0], count: count))
-        )
+        if recordsMicrophone {
+            writer.appendMicrophone(
+                Array(UnsafeBufferPointer(start: channelBuffers[0], count: count))
+            )
+        }
         let tapChannel = channelCount - 1
         if tapChannel > 0 {
             writer.appendSystemAudio(

@@ -27,6 +27,12 @@ final class RecorderController {
     // MARK: - Choices
 
     var microphoneID: String?
+
+    /// Whether the microphone is recorded at all. The chosen device is kept
+    /// either way, so switching the microphone off and on again does not lose
+    /// it — and so `refreshDevices()` never has to guess what a nil id means.
+    var recordsMicrophone = true
+
     var systemAudio: SystemAudioSource = .none
     var destinationFolder: URL
     var filename: String = RecorderController.defaultFilename()
@@ -113,6 +119,11 @@ final class RecorderController {
         if microphoneID == nil || !microphones.contains(where: { $0.id == microphoneID }) {
             microphoneID = microphones.first?.id
         }
+        // A Mac with no input device attached has no microphone to switch on.
+        // Said out loud rather than left implied: the picker shows "Off" for a
+        // nil device either way, and this stops it saying so while the
+        // recorder still expects the microphone to arrive.
+        if microphones.isEmpty { recordsMicrophone = false }
         // Only once the process itself is gone — quitting the app being
         // recorded is the one case where the choice genuinely cannot stand.
         // Falling back on silence alone would move the recording to
@@ -126,8 +137,18 @@ final class RecorderController {
 
     // MARK: - Recording
 
+    /// Nothing selected on either side. Recording this would produce a file of
+    /// silence, so the button is disabled and `start()` refuses.
+    var hasNothingToRecord: Bool {
+        !recordsMicrophone && systemAudio == .none
+    }
+
     func start() async {
         guard state == .idle else { return }
+        guard !hasNothingToRecord else {
+            error = .nothingToRecord
+            return
+        }
         error = nil
         finishedRecording = nil
         systemAudioSeemsSilent = false
@@ -137,6 +158,7 @@ final class RecorderController {
         let url = destinationFolder.appendingPathComponent(sanitisedFilename)
         let configuration = RecordingConfiguration(
             microphoneID: microphoneID,
+            recordsMicrophone: recordsMicrophone,
             systemAudio: systemAudio,
             outputURL: url
         )
@@ -150,6 +172,7 @@ final class RecorderController {
         do {
             let writer = try TwoChannelWriter(url: url)
             if systemAudio == .none { writer.markSilent(.system) }
+            if !recordsMicrophone { writer.markSilent(.microphone) }
 
             try await source.prepare(configuration)
             try await source.start(writingTo: writer)

@@ -235,6 +235,19 @@ Both honour the same contract — microphone on channel 0, system audio on chann
 via `TwoChannelWriter`. Keeping the sides apart is free while recording and
 impossible to recover afterwards.
 
+The microphone is optional (`RecordingConfiguration.recordsMicrophone`): a call
+you are only listening to is recorded with channel 0 deliberately silent, which
+`AudioSourcePreparer` then drops as "a side with nothing on it is not a side",
+so the transcript marks every voice as being on the call. Off is a flag rather
+than a nil `microphoneID`, because nil there already means the system default
+— and `RecorderController.refreshDevices()` reassigns a nil id every couple of
+seconds. `ScreenCaptureRecorder` genuinely leaves the microphone out, so that
+mode never asks for the microphone permission; `AggregateDeviceRecorder` still
+captures channel 0 and discards it, because the aggregate device's clock is
+owned by the microphone as its main sub-device — making that permission-free
+means rebuilding the aggregate around the default *output* device, whose only
+input channel would be the mono tap.
+
 **UI.** `MacApp` registers the scenes (main, recorder, models, welcome,
 settings, about, attributions, help). `WelcomeWindow` opens once from
 `MainWindow`'s `RootView` — a view, not a scene modifier, because the check

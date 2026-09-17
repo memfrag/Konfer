@@ -69,6 +69,25 @@ struct TwoChannelWriterTests {
         #expect(audio.right.allSatisfy { $0 == 0 })
     }
 
+    @Test("Recording with the microphone off leaves the left channel silent")
+    func silentMicrophoneStillWritesTheOtherSide() throws {
+        let url = makeURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        // What the recorder does when the microphone is switched off: the other
+        // side arrives as usual and channel 0 is declared silent rather than
+        // merely never delivered, so it cannot hold the recording up.
+        let writer = try TwoChannelWriter(url: url)
+        writer.markSilent(.microphone)
+        writer.appendSystemAudio([Float](repeating: -0.5, count: 2400))
+        writer.finish()
+
+        let audio = try read(url)
+        #expect(audio.frames == 2400)
+        #expect(audio.left.allSatisfy { $0 == 0 })
+        #expect(audio.right.allSatisfy { $0 < -0.4 })
+    }
+
     @Test("Sides arriving at different rates stay aligned")
     func unevenArrivalStaysAligned() throws {
         let url = makeURL()
