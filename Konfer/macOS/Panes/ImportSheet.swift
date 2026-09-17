@@ -208,13 +208,19 @@ struct ImportSheet: View {
                 Text("Keeping \(Timecode.short(range.start))–\(Timecode.short(range.end))")
                     .font(.caption)
                     .monospacedDigit()
-                Button("Reset") { self.range = KeptRange(start: 0, end: duration) }
-                    .controlSize(.small)
             } else {
                 Text("Whole recording")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            // Laid out in both states and merely disabled, because a small
+            // button is taller than the caption beside it: letting Reset appear
+            // with the first drag grew the sheet — its height is free, only the
+            // width is fixed — and shifted everything above it.
+            Button("Reset") { range = KeptRange(start: 0, end: duration) }
+                .controlSize(.small)
+                .disabled(!isTrimmed)
         }
     }
 
