@@ -24,7 +24,68 @@ Three stages:
 Diarization and recognition run in sequence, not in parallel: both saturate the
 Neural Engine, so concurrency buys nothing and makes progress meaningless.
 
-## Choosing a model
+### Two channels, one transcript
+
+A recording keeps the microphone on channel 0 and system audio — the other end
+of the call, the video playing in Safari — on channel 1, because that separation
+is free while recording and impossible to recover afterwards. Every stage above
+then reduces the file to 16 kHz mono before it listens to it, and that is where
+the second side used to disappear: `AVAudioConverter`, asked for one channel out
+of two, **keeps channel 0 and discards the rest** rather than mixing them. On a
+file with a different sentence on each channel, the system-audio half comes back
+as digital silence — peak 0.0 — and `SpeechAnalyzer` returns the microphone
+sentence alone. WhisperKit sums channels itself, so Swedish heard both sides
+while English never did.
+
+So `AudioSourcePreparer` folds the channels together itself, once, ahead of all
+three consumers. The sum is scaled so its peak matches the loudest single
+channel rather than being halved: that prevents a clip where the two sides talk
+over each other and leaves a quiet far-field microphone where it was. One global
+factor, not one per buffer — a gain that moves with the content is a gain the
+diarizer's embeddings can hear. It costs a second decode pass: 11 s on an hour
+of 48 kHz stereo, against the ten minutes that hour spends being transcribed.
+
+Multi-channel imports get the same treatment, which is why a stereo interview or
+a 5.1 film soundtrack no longer transcribes as its front-left channel alone.
+
+### Using the sides, rather than only surviving them
+
+Folding makes the second source audible. It also throws away something worth
+keeping: the people on the call are not the people in the room, and the file
+says so. So the two sides are also written out separately and **diarized
+separately**, and each word is attributed to the side that was louder while it
+was spoken — read off the channels, not inferred from anything. A voice in the
+room and a voice on the call can then never be merged into one speaker however
+alike they sound, and a speaker chip says which side it was heard on.
+
+Only diarization is doubled, not transcription. On the 1 h 17 m meeting
+measured below, that is the difference between paying 28.9 s twice and paying 585 s twice, and
+the obvious way to make per-side transcription affordable — masking each side to
+its own speech regions — is precisely the strategy measured below as losing
+between 14% and 49% of the words. One ASR pass over the fold, two cheap
+diarization passes, attribution from the channels.
+
+The same ten-second fixture, one sentence per channel, through both paths:
+
+| | Result |
+|---|---|
+| Folded only | *Speaker 1: …microphone channel speaking now. This sentence comes from the system audio* / *Speaker 2: channel, played back through Safari.* |
+| Sides kept | *Speaker 1 (in the room): …microphone channel speaking now.* / *Speaker 2 (on the call): This sentence comes from the system audio channel, played back through Safari.* |
+
+Folded, the clusterer put the speaker change three words into the wrong
+sentence, which is the ordinary failure of asking one pass to separate two
+rooms. It is not a failure the channels can have.
+
+Whether a file *is* two-sided is never guessed. An ordinary stereo file is one
+sound field in two channels, and treating it as two sources would file one
+speaker's words under two speakers — while two microphones a metre apart
+correlate no better than two unrelated sources do, so there is nothing reliable
+to measure. Only Konfer's own recorder knows, so only it says so, and a meeting
+remembers what it was told for when it is transcribed again. A side with nothing
+on it is not a side: recording with nothing playing costs one diarization pass,
+exactly as before.
+
+## Choosing a model## Choosing a model
 
 Apple's `SpeechTranscriber` covers 30 locales and **Swedish is not one of them**,
 so Swedish has to go elsewhere. KB-Whisper is the National Library of Sweden's

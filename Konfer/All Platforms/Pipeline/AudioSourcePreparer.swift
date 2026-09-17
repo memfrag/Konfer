@@ -3,13 +3,15 @@
 //
 
 import AVFoundation
+import Accelerate
 import Foundation
 
 /// The audio file handed to FluidAudio, plus how to clean up after it.
 nonisolated struct PreparedAudio: Sendable {
 
-    /// The file the pipeline should read. Either the user's own file or, for
-    /// video input, a temporary audio-only extraction of it.
+    /// The file the pipeline should read. Either the user's own file or a
+    /// temporary one derived from it: audio extracted from video, a trim, or
+    /// the channels folded into one.
     let url: URL
 
     /// Length of `url` — the trimmed extract when there is one, so the stages
@@ -25,16 +27,29 @@ nonisolated struct PreparedAudio: Sendable {
     /// put the timestamps back where they belong. Zero unless trimmed.
     let startOffset: TimeInterval
 
-    /// Set when `url` is a temporary file this run created.
-    let temporaryFile: URL?
+    /// The recording's sources as separate mono files, on the same timeline
+    /// as `url`. Empty unless the caller said this recording keeps its sources
+    /// apart; one entry when only one of them turned out to carry signal.
+    let sides: [PreparedSide]
+
+    /// Temporary files this run created, for it to delete afterwards.
+    let temporaryFiles: [URL]
 
     func cleanUp() {
-        guard let temporaryFile else { return }
-        try? FileManager.default.removeItem(at: temporaryFile)
+        for file in temporaryFiles {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 }
 
-/// Normalizes whatever the user dropped into something FluidAudio can open.
+/// One source of a two-sided recording, on its own.
+nonisolated struct PreparedSide: Sendable {
+    let side: RecordingSide
+    let url: URL
+}
+
+/// Normalizes whatever the user dropped into something FluidAudio can open:
+/// one channel, no video container.
 ///
 /// Both `AudioConverter.resampleAudioFile` and `AudioSourceFactory` open files
 /// with `AVAudioFile`, which reads audio containers but not video ones. Since
@@ -44,12 +59,21 @@ nonisolated struct PreparedAudio: Sendable {
 ///
 nonisolated enum AudioSourcePreparer {
 
-    /// - Parameter trimmedTo: The stretch to transcribe, or nil for all of it.
-    ///   A trim always goes through the export path, audio or video, because
-    ///   the stages downstream take a file and have nowhere to put a range.
+    /// - Parameters:
+    ///   - trimmedTo: The stretch to transcribe, or nil for all of it. The
+    ///     stages downstream take a file and have nowhere to put a range, so a
+    ///     trim is always a new file.
+    ///   - separatingSources: Whether this recording keeps two independent
+    ///     sources on its two channels — the microphone and system audio, as
+    ///     ``TwoChannelWriter`` writes them. Only the recorder knows that, and
+    ///     it is not a thing to guess at: an ordinary stereo file is one sound
+    ///     field in two channels, and a pair of microphones a metre apart
+    ///     correlates no better than two unrelated sources do. Claimed
+    ///     wrongly, it would file one speaker's words under two speakers.
     static func prepare(
         _ url: URL,
-        trimmedTo trim: KeptRange? = nil
+        trimmedTo trim: KeptRange? = nil,
+        separatingSources: Bool = false
     ) async throws -> PreparedAudio {
 
         let asset = AVURLAsset(url: url)
@@ -59,21 +83,6 @@ nonisolated enum AudioSourcePreparer {
             sourceDuration = try await asset.load(.duration).seconds
         } catch {
             throw PipelineError.audioUnreadable(url, underlying: error)
-        }
-
-        let hasVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
-        guard hasVideo || trim != nil else {
-            return PreparedAudio(
-                url: url,
-                duration: sourceDuration,
-                sourceDuration: sourceDuration,
-                startOffset: 0,
-                temporaryFile: nil
-            )
-        }
-
-        guard try await !asset.loadTracks(withMediaType: .audio).isEmpty else {
-            throw PipelineError.noAudioTrack(url)
         }
 
         // Clamped to the file: a range dragged to the very end can name a
@@ -86,24 +95,247 @@ nonisolated enum AudioSourcePreparer {
             )
         }
 
-        let extracted = try await extractAudio(from: asset, trimmedTo: range)
+        let hasVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
+
+        var working = url
+        var temporary: URL?
+        var pendingRange = range
+
+        // Video, or audio in a container `AVAudioFile` cannot open, has to go
+        // through an export session; anything else is trimmed in the pass that
+        // folds it, which is both exact to the sample and free of the AAC
+        // round trip an export would put in the way of two unrelated sources.
+        if hasVideo || (range != nil && (try? AVAudioFile(forReading: url)) == nil) {
+            guard try await !asset.loadTracks(withMediaType: .audio).isEmpty else {
+                throw PipelineError.noAudioTrack(url)
+            }
+            working = try await extractAudio(from: asset, trimmedTo: range)
+            temporary = working
+            pendingRange = nil
+        }
+
+        var sides: [PreparedSide] = []
+
+        if let derived = try derive(
+            working,
+            keeping: pendingRange,
+            separatingSources: separatingSources && !hasVideo
+        ) {
+            // Whatever it was derived from was only ever a step on the way.
+            if let temporary { try? FileManager.default.removeItem(at: temporary) }
+            working = derived.mono
+            temporary = derived.mono
+            sides = derived.sides
+        }
+
         return PreparedAudio(
-            url: extracted,
+            url: working,
             duration: range.map(\.duration) ?? sourceDuration,
             sourceDuration: sourceDuration,
             startOffset: range?.start ?? 0,
-            temporaryFile: extracted
+            sides: sides,
+            temporaryFiles: [temporary].compactMap { $0 } + sides.map(\.url)
         )
     }
+
+    // MARK: - Channels
+
+    /// What one read pass produced: the single channel every stage reads, and
+    /// the recording's two sources kept apart when it has two.
+    private struct Derived {
+        let mono: URL
+        let sides: [PreparedSide]
+    }
+
+    /// Below this a channel is a dead input or digital silence rather than a
+    /// source — a peak of 0.005 is −46 dBFS, and a microphone left muted for
+    /// an hour does not reach it.
+    private static let silenceFloor: Float = 0.005
+
+    /// Folds every channel of a file into one, applies any trim, and writes
+    /// the two sides separately when this recording has two. Nil when the file
+    /// is already a single channel and nothing is being cut out of it.
+    ///
+    /// The fold is the step that makes the second source audible at all. A
+    /// Konfer recording keeps the microphone on channel 0 and system audio on
+    /// channel 1 — see ``TwoChannelWriter`` — and every stage downstream
+    /// reduces the file to 16 kHz mono before it looks at it. FluidAudio does
+    /// that with an `AVAudioConverter`, and so, evidently, does
+    /// `SpeechAnalyzer`: asked for one channel out of two, that converter
+    /// **keeps channel 0 and discards the rest** rather than mixing them.
+    /// Measured on a file with a different sentence on each channel, the
+    /// system-audio half comes back as digital silence — peak 0.0 — and
+    /// Apple's transcriber returns the microphone sentence alone. WhisperKit
+    /// sums channels itself, which is why Swedish heard both sides while
+    /// English never did.
+    ///
+    /// The sum is scaled so its peak matches the loudest single channel rather
+    /// than being halved, which both prevents a clip where the two sides talk
+    /// over each other and leaves a quiet far-field microphone where it was.
+    /// One global factor, not one per buffer: a gain that moves with the
+    /// content is a gain the diarizer's embeddings can hear. It costs a second
+    /// decode pass — folding an hour of 48 kHz stereo takes 11 s all told,
+    /// against the ten minutes that hour spends being transcribed.
+    ///
+    /// The sides are written during the same pass, so keeping them costs one
+    /// more file rather than one more read.
+    private static func derive(
+        _ url: URL,
+        keeping range: KeptRange?,
+        separatingSources: Bool
+    ) throws -> Derived? {
+
+        // A file `AVAudioFile` cannot open is left exactly as it is: the stage
+        // that needs it reports that far better than a preparation step can.
+        guard let input = try? AVAudioFile(forReading: url) else { return nil }
+        let format = input.processingFormat
+        let channels = Int(format.channelCount)
+        guard channels > 1 || range != nil else { return nil }
+
+        let bounds = frames(of: range, at: format.sampleRate, length: input.length)
+
+        do {
+            // Pass one: the peaks that set the gain, and whether both sources
+            // turned out to have anything on them.
+            var loudestSum: Float = 0
+            var peaks = [Float](repeating: 0, count: channels)
+
+            try AudioBuffers.forEach(in: input, within: bounds) { buffer in
+                let frames = vDSP_Length(buffer.frameLength)
+                guard let data = buffer.floatChannelData else { return }
+                for channel in 0..<channels {
+                    var peak: Float = 0
+                    vDSP_maxmgv(data[channel], 1, &peak, frames)
+                    peaks[channel] = max(peaks[channel], peak)
+                }
+                var peak: Float = 0
+                vDSP_maxmgv(Self.sum(buffer, channels: channels), 1, &peak, frames)
+                loudestSum = max(loudestSum, peak)
+            }
+            let loudestChannel = peaks.max() ?? 0
+            var gain = loudestSum > 0 ? loudestChannel / loudestSum : 1
+
+            // A side with nothing on it is not a side: a meeting recorded
+            // with nothing playing has one source, whatever the recorder
+            // believed when it started, and diarizing its silent half would
+            // cost a pass to find nobody. The other side keeps its name.
+            let present: [RecordingSide] = separatingSources && channels == 2
+                ? RecordingSide.allCases.filter { peaks[$0.channel] > silenceFloor }
+                : []
+
+            // Pass two: write it, and the sides with it.
+            guard let monoFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: format.sampleRate,
+                channels: 1,
+                interleaved: false
+            ) else { return nil }
+
+            let mono = temporaryURL()
+            var output: AVAudioFile? = try monoFile(at: mono, rate: format.sampleRate)
+
+            let sides = present.map { PreparedSide(side: $0, url: temporaryURL()) }
+            var sideFiles: [AVAudioFile?] = try sides.map {
+                try monoFile(at: $0.url, rate: format.sampleRate)
+            }
+
+            try AudioBuffers.forEach(in: input, within: bounds) { buffer in
+                guard let data = buffer.floatChannelData else { return }
+                let frames = vDSP_Length(buffer.frameLength)
+
+                let summed = Self.sum(buffer, channels: channels)
+                try Self.write(buffer.frameLength, format: monoFormat, to: output) { target in
+                    vDSP_vsmul(summed, 1, &gain, target, 1, frames)
+                }
+
+                for (index, side) in sides.enumerated() {
+                    try Self.write(buffer.frameLength, format: monoFormat, to: sideFiles[index]) { target in
+                        target.update(from: data[side.side.channel], count: Int(frames))
+                    }
+                }
+            }
+            // An `.m4a` is only a valid file once `AVAudioFile` has finalised
+            // its container, which it does when it is released — so these have
+            // to be let go before anyone reads them, not merely finished with.
+            output = nil
+            sideFiles = []
+
+            return Derived(mono: mono, sides: sides)
+        } catch {
+            throw PipelineError.audioUnreadable(url, underlying: error)
+        }
+    }
+
+    /// A time range as frame positions in a file, clamped to it.
+    private static func frames(
+        of range: KeptRange?,
+        at rate: Double,
+        length: AVAudioFramePosition
+    ) -> Range<AVAudioFramePosition>? {
+        guard let range else { return nil }
+        let start = max(0, min(AVAudioFramePosition(range.start * rate), length))
+        let end = max(start, min(AVAudioFramePosition(range.end * rate), length))
+        return start..<end
+    }
+
+    private static func temporaryURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("Konfer-\(UUID().uuidString)")
+            .appendingPathExtension("m4a")
+    }
+
+    /// Lossless, for the same reason the recorder is: these files are what the
+    /// whole transcript is derived from.
+    private static func monoFile(at url: URL, rate: Double) throws -> AVAudioFile {
+        try AVAudioFile(forWriting: url, settings: [
+            AVFormatIDKey: kAudioFormatAppleLossless,
+            AVSampleRateKey: rate,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitDepthHintKey: 16,
+        ])
+    }
+
+    private static func write(
+        _ frames: AVAudioFrameCount,
+        format: AVAudioFormat,
+        to file: AVAudioFile?,
+        filling: (UnsafeMutablePointer<Float>) -> Void
+    ) throws {
+        guard let file,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames),
+              let target = buffer.floatChannelData
+        else { return }
+        buffer.frameLength = frames
+        filling(target[0])
+        try file.write(from: buffer)
+    }
+
+    /// Every channel of one buffer added together, unscaled.
+    private static func sum(_ buffer: AVAudioPCMBuffer, channels: Int) -> [Float] {
+        let frames = Int(buffer.frameLength)
+        guard let data = buffer.floatChannelData else { return [] }
+        var summed = [Float](repeating: 0, count: frames)
+        summed.withUnsafeMutableBufferPointer { output in
+            for channel in 0..<channels {
+                vDSP_vadd(
+                    output.baseAddress!, 1,
+                    data[channel], 1,
+                    output.baseAddress!, 1,
+                    vDSP_Length(frames)
+                )
+            }
+        }
+        return summed
+    }
+
+    // MARK: - Video
 
     private static func extractAudio(
         from asset: AVURLAsset,
         trimmedTo range: KeptRange?
     ) async throws -> URL {
 
-        let destination = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Konfer-\(UUID().uuidString)")
-            .appendingPathExtension("m4a")
+        let destination = temporaryURL()
 
         guard let session = AVAssetExportSession(
             asset: asset,

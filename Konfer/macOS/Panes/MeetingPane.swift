@@ -126,7 +126,10 @@ struct MeetingPane: View {
                         expectedSpeakers: speakers,
                         trim: trim,
                         replacing: meeting.id,
-                        title: meeting.title
+                        title: meeting.title,
+                        // What the first run knew about the file, rather than
+                        // what a second look at it would guess.
+                        separatesSources: meeting.hasSeparateSources ?? false
                     )
                 }
             }

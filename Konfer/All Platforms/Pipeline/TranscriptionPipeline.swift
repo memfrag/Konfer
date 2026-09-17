@@ -33,6 +33,12 @@ final class TranscriptionPipeline {
         /// The stretch to transcribe, or nil for the whole recording.
         let trim: KeptRange?
 
+        /// Whether this recording keeps the microphone and system audio on
+        /// separate channels. True only for Konfer's own recordings, which is
+        /// the only case anyone knows it for certain — see
+        /// ``AudioSourcePreparer/prepare(_:trimmedTo:separatingSources:)``.
+        let separatesSources: Bool
+
         /// The meeting this run replaces, when it is a re-run rather than an
         /// import. A failed or garbled transcript is worth another attempt on a
         /// narrower range, and it should land back on the same row in the
@@ -124,7 +130,8 @@ final class TranscriptionPipeline {
         expectedSpeakers: Int? = nil,
         trim: KeptRange? = nil,
         replacing: UUID? = nil,
-        title: String? = nil
+        title: String? = nil,
+        separatesSources: Bool = false
     ) {
         let job = Job(
             sourceURL: url,
@@ -134,6 +141,7 @@ final class TranscriptionPipeline {
             backend: Self.backendOverride ?? ASRBackendKind(transcribing: language),
             fastTranscription: fastTranscription,
             trim: trim,
+            separatesSources: separatesSources,
             replacing: replacing
         )
         queue.append(job)
@@ -203,18 +211,22 @@ final class TranscriptionPipeline {
                 throw PipelineError.modelNotDownloaded(required)
             }
 
-            // 1. Normalize the input. Video files get their audio extracted to a
-            //    temporary file; audio files pass straight through.
+            // 1. Normalize the input. Video files get their audio extracted to
+            //    a temporary file, and anything with more than one channel is
+            //    folded into one — a recording keeps the microphone and system
+            //    audio apart, and nothing below this line would hear the
+            //    second of them otherwise.
             let audio = try await AudioSourcePreparer.prepare(
                 job.sourceURL,
-                trimmedTo: job.trim
+                trimmedTo: job.trim,
+                separatingSources: job.separatesSources
             )
             prepared = audio
             try checkCancellation()
 
             // 2. Diarization: models, then the pass itself. A failure here is
             //    survivable — see the degraded path below.
-            var segments: [TimedSpeakerSegment] = []
+            var sides: [DiarizedSide] = []
             var degraded: DegradedStage?
 
             do {
@@ -225,18 +237,13 @@ final class TranscriptionPipeline {
                 try checkCancellation()
 
                 stage = .diarizing(0)
-                segments = try await diarizer.diarize(
-                    audio.url,
-                    expectedSpeakers: job.expectedSpeakers
-                ) { [weak self] fraction in
-                    Task { @MainActor in self?.stage = .diarizing(fraction) }
-                }
-                if segments.isEmpty { degraded = .diarization }
+                sides = try await diarize(audio, expectedSpeakers: job.expectedSpeakers)
+                if sides.allSatisfy(\.segments.isEmpty) { degraded = .diarization }
             } catch is CancellationError {
                 throw PipelineError.cancelled
             } catch {
                 // No speakers is not a reason to throw away a transcript.
-                segments = []
+                sides = []
                 degraded = .diarization
             }
             try checkCancellation()
@@ -263,7 +270,7 @@ final class TranscriptionPipeline {
                     url: audio.url,
                     language: job.language,
                     speechRegions: SpeechRegion.regions(
-                        from: segments,
+                        from: sides.flatMap(\.segments),
                         padding: SpeechRegion.padding
                     ),
                     allowsChunking: job.fastTranscription
@@ -285,11 +292,20 @@ final class TranscriptionPipeline {
             //    middle of the recording. They are put back here, once, so
             //    that nothing downstream — playback, waveform, export — has to
             //    know a trim happened.
+            // Nothing to attribute unless there are two sides to attribute
+            // between, and measuring them is a read of the whole recording.
+            let envelopes = sides.count > 1
+                ? await Self.envelopes(of: audio.sides)
+                : []
             let utterances = Self.shifting(
-                SpeakerAligner.align(words: transcribed.words, segments: segments),
+                SpeakerAligner.align(
+                    words: transcribed.words,
+                    across: sides,
+                    envelopes: envelopes
+                ),
                 by: audio.startOffset
             )
-            let speakers = makeSpeakerLabels(segments: segments, utterances: utterances)
+            let speakers = makeSpeakerLabels(sides: sides, utterances: utterances)
             let cuts = transcribed.sliceCuts.map { $0 + audio.startOffset }
 
             if let replacing = job.replacing, var existing = meetingStore.meeting(replacing) {
@@ -301,6 +317,7 @@ final class TranscriptionPipeline {
                 existing.degraded = degraded
                 existing.sliceCuts = cuts.isEmpty ? nil : cuts
                 existing.wasFastTranscribed = job.fastTranscription ? true : nil
+                existing.hasSeparateSources = job.separatesSources ? true : nil
                 existing.duration = audio.sourceDuration
 
                 // The language the re-run was told to use, which may not be
@@ -332,7 +349,8 @@ final class TranscriptionPipeline {
                     // Left nil on a trimmed import: nothing was transcribed
                     // outside the range, so there is nothing to collapse.
                     keptRange: nil,
-                    wasFastTranscribed: job.fastTranscription ? true : nil
+                    wasFastTranscribed: job.fastTranscription ? true : nil,
+                    hasSeparateSources: job.separatesSources ? true : nil
                 )
                 meetingStore.add(meeting)
                 lastFinishedMeetingID = meeting.id
@@ -371,6 +389,63 @@ final class TranscriptionPipeline {
         }
     }
 
+    // MARK: - Diarization
+
+    /// Finds who spoke when: once per source when the recording keeps them
+    /// apart, otherwise once over the whole file.
+    ///
+    /// - Parameter expectedSpeakers: Passed on only when there is a single
+    ///   pass. The user is asked how many people are in the meeting, which is
+    ///   not how many are in the room or how many are on the call, and handing
+    ///   the same total to both passes would push each of them to invent
+    ///   speakers the other one has.
+    private func diarize(
+        _ audio: PreparedAudio,
+        expectedSpeakers: Int?
+    ) async throws -> [DiarizedSide] {
+
+        guard !audio.sides.isEmpty else {
+            let segments = try await diarizer.diarize(
+                audio.url,
+                expectedSpeakers: expectedSpeakers
+            ) { [weak self] fraction in
+                Task { @MainActor in self?.stage = .diarizing(fraction) }
+            }
+            return [DiarizedSide(side: nil, segments: segments)]
+        }
+
+        let passes = audio.sides.count
+        var diarized: [DiarizedSide] = []
+        for (index, side) in audio.sides.enumerated() {
+            let segments = try await diarizer.diarize(
+                side.url,
+                expectedSpeakers: passes == 1 ? expectedSpeakers : nil
+            ) { [weak self] fraction in
+                let overall = (Double(index) + fraction) / Double(passes)
+                Task { @MainActor in self?.stage = .diarizing(overall) }
+            }
+            diarized.append(DiarizedSide(side: side.side, segments: segments))
+        }
+        return diarized
+    }
+
+    /// How loud each side was, frame by frame, for attributing words to one.
+    ///
+    /// `nonisolated`, so it runs off the main actor: it reads both side files
+    /// start to finish, about 4 s per hour of audio each, and this pipeline's
+    /// own integration test counts a blocked main thread as a failure in
+    /// itself.
+    ///
+    /// A side that cannot be measured is left out, and the aligner falls back
+    /// to attributing words without sides rather than losing them.
+    private nonisolated static func envelopes(
+        of sides: [PreparedSide]
+    ) async -> [SideEnvelope] {
+        sides.compactMap {
+            try? SideEnvelope.measure($0.url, side: $0.side)
+        }
+    }
+
     private func checkCancellation() throws {
         if Task.isCancelled { throw PipelineError.cancelled }
     }
@@ -381,18 +456,26 @@ final class TranscriptionPipeline {
     ///
     /// Clusters are numbered by when they first speak, so "Speaker 1" is the
     /// person who opened the meeting rather than whichever id the clusterer
-    /// happened to assign first.
+    /// happened to assign first. Numbering runs across the sides rather than
+    /// within each: the roster is one list of people, and which side each of
+    /// them was on is carried by the label, not by their number.
     private func makeSpeakerLabels(
-        segments: [TimedSpeakerSegment],
+        sides: [DiarizedSide],
         utterances: [Utterance]
     ) -> [SpeakerLabel] {
 
         var order: [String] = []
         var grouped: [String: [TimedSpeakerSegment]] = [:]
+        var sideOfSpeaker: [String: RecordingSide] = [:]
 
-        for segment in segments.sorted(by: { $0.startTimeSeconds < $1.startTimeSeconds }) {
+        let all = sides
+            .flatMap { side in side.segments.map { (side.side, $0) } }
+            .sorted { $0.1.startTimeSeconds < $1.1.startTimeSeconds }
+
+        for (side, segment) in all {
             if grouped[segment.speakerId] == nil { order.append(segment.speakerId) }
             grouped[segment.speakerId, default: []].append(segment)
+            if let side { sideOfSpeaker[segment.speakerId] = side }
         }
 
         var labels: [SpeakerLabel] = order.enumerated().map { index, id in
@@ -403,7 +486,8 @@ final class TranscriptionPipeline {
                 embedding: VoiceEmbedding.mean(of: clusterSegments),
                 totalDuration: clusterSegments.reduce(0) {
                     $0 + TimeInterval($1.durationSeconds)
-                }
+                },
+                side: sideOfSpeaker[id]
             )
         }
 

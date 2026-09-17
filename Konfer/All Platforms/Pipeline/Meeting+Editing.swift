@@ -66,6 +66,10 @@ nonisolated extension Meeting {
             (absorbed.embedding, absorbed.totalDuration)
         )
         speakers[destinationIndex].totalDuration += absorbed.totalDuration
+        // Merging across the sides is a correction — someone in the room whose
+        // words leaked onto the call's channel, say — and once the two are one
+        // person, neither side is the truth about them any more.
+        if keeper.side != absorbed.side { speakers[destinationIndex].side = nil }
         speakers.remove(at: sourceIndex)
 
         for index in utterances.indices where utterances[index].speakerId == source {

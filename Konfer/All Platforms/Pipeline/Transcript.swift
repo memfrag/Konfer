@@ -98,13 +98,19 @@ nonisolated struct SpeakerLabel: Identifiable, Codable, Hashable, Sendable {
     /// Suggestions are never applied automatically — see ``SpeakerStore``.
     var suggestion: EnrollmentSuggestion?
 
+    /// Which source this speaker was heard on, when the recording kept its
+    /// sources apart. Nil for an imported file, and for every meeting
+    /// transcribed before Konfer looked at the channels separately.
+    var side: RecordingSide?
+
     init(
         id: String,
         name: String,
         isNamed: Bool = false,
         embedding: [Float] = [],
         totalDuration: TimeInterval = 0,
-        suggestion: EnrollmentSuggestion? = nil
+        suggestion: EnrollmentSuggestion? = nil,
+        side: RecordingSide? = nil
     ) {
         self.id = id
         self.name = name
@@ -112,6 +118,7 @@ nonisolated struct SpeakerLabel: Identifiable, Codable, Hashable, Sendable {
         self.embedding = embedding
         self.totalDuration = totalDuration
         self.suggestion = suggestion
+        self.side = side
     }
 }
 
@@ -347,6 +354,12 @@ nonisolated struct Meeting: Identifiable, Codable, Hashable, Sendable {
     /// which is known to drop speech. Optional so meetings written before the
     /// setting existed still decode.
     var wasFastTranscribed: Bool?
+
+    /// Set when the recording keeps the microphone and system audio on
+    /// separate channels, which only Konfer's own recorder produces. Kept so
+    /// that transcribing again reads it the same way the first run did, rather
+    /// than guessing from a file that looks like ordinary stereo.
+    var hasSeparateSources: Bool?
 
     /// The transcript in another language, or nil if it was never translated.
     /// Optional so meetings written before translation existed still decode.

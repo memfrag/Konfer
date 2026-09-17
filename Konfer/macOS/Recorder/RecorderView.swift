@@ -48,7 +48,11 @@ struct RecorderView: View {
                     finished.url,
                     language: language,
                     expectedSpeakers: speakers,
-                    trim: trim
+                    trim: trim,
+                    // Konfer wrote this file, so the two channels are known to
+                    // be the microphone and system audio rather than a stereo
+                    // image. Nothing else can tell the pipeline that.
+                    separatesSources: true
                 )
             }
         }

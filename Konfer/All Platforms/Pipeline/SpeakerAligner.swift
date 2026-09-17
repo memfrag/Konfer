@@ -86,6 +86,45 @@ nonisolated enum SpeakerAligner {
         return turns
     }
 
+    /// Attributes each word to a speaker when the recording kept its sources
+    /// apart.
+    ///
+    /// Which side a word came from is not inferred, it is read: the two
+    /// channels were recorded separately, so the louder of them during a word
+    /// is the source that said it. Each side's words are then matched only
+    /// against that side's speakers, which is why a person in the room and a
+    /// person on the call can never be merged into one speaker however alike
+    /// they sound — and why neither can be attributed to the other during the
+    /// stretches where they talk over each other.
+    ///
+    /// - Parameters:
+    ///   - sides: One entry per source, speakers already qualified by side.
+    ///   - envelopes: Loudness per side, on the same timeline as `words`.
+    static func align(
+        words: [WordSpan],
+        across sides: [DiarizedSide],
+        envelopes: [SideEnvelope]
+    ) -> [Utterance] {
+
+        // One source, or sides that could not be measured: every speaker the
+        // run found, attributed the way an ordinary file is. Words are never
+        // dropped for want of a side.
+        guard sides.count > 1, envelopes.count == sides.count else {
+            return align(words: words, segments: sides.flatMap(\.segments))
+        }
+
+        // A side the diarizer found nothing on still keeps its words: they
+        // land under the unknown speaker, which is what a degraded run looks
+        // like everywhere else.
+        let turns = SideAttribution.split(words, between: envelopes).flatMap { side, words in
+            align(
+                words: words,
+                segments: sides.first { $0.side == side }?.segments ?? []
+            )
+        }
+        return turns.sorted { $0.start < $1.start }
+    }
+
     // MARK: - Attribution
 
     /// The speaker whose segment overlaps this word most.

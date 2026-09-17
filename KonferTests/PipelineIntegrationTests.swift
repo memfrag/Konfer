@@ -51,6 +51,13 @@ struct PipelineIntegrationTests {
         ProcessInfo.processInfo.environment["KONFER_LIBRARY"] == "real"
     }
 
+    /// `KONFER_SIDES=1` says the recording is one of Konfer's own, with the
+    /// microphone on channel 0 and system audio on channel 1, which is the one
+    /// thing about a file the pipeline is never willing to guess.
+    nonisolated static var separatesSources: Bool {
+        ProcessInfo.processInfo.environment["KONFER_SIDES"] == "1"
+    }
+
     @Test(
         "Transcribes a real recording into speaker-attributed turns",
         .enabled(if: PipelineIntegrationTests.audioURL != nil),
@@ -89,7 +96,11 @@ struct PipelineIntegrationTests {
         var stageStarted = Date()
         let runStarted = Date()
 
-        pipeline.enqueue(url, language: Self.language)
+        pipeline.enqueue(
+            url,
+            language: Self.language,
+            separatesSources: Self.separatesSources
+        )
 
         var lastTick = Date()
         var worstStall: TimeInterval = 0
@@ -154,6 +165,27 @@ struct PipelineIntegrationTests {
         // Turns must come out in transcript order.
         for (previous, next) in zip(meeting.utterances, meeting.utterances.dropFirst()) {
             #expect(previous.start <= next.start)
+        }
+
+        // Each side is diarized on its own, so no speaker may carry another
+        // side's cluster id, and every turn must belong to a speaker who was
+        // actually heard on the side it was attributed to.
+        if Self.separatesSources {
+            #expect(meeting.hasSeparateSources == true)
+            for speaker in meeting.speakers where speaker.id != SpeakerLabel.unknownID {
+                let side = try #require(speaker.side)
+                #expect(speaker.id.hasPrefix(side.idPrefix))
+            }
+            for side in RecordingSide.allCases {
+                let speakers = meeting.speakers.filter { $0.side == side }
+                let turns = meeting.utterances.filter { utterance in
+                    speakers.contains { $0.id == utterance.speakerId }
+                }
+                print("\(side.displayName): \(speakers.count) speakers, \(turns.count) turns")
+                for turn in turns.prefix(3) {
+                    print("    \(meeting.displayName(for: turn.speakerId)): \(turn.text)")
+                }
+            }
         }
 
         // Enough of a report to eyeball the result in the test log.

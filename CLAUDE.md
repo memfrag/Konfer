@@ -43,7 +43,8 @@ TEST_RUNNER_KONFER_AUDIO=/path/to/meeting.wav \
 ```
 
 `PipelineIntegrationTests` also reads `KONFER_BACKEND`, `KONFER_LANGUAGE`,
-`KONFER_FAST` and `KONFER_LIBRARY=real`; `RecordingSourceTests` needs
+`KONFER_FAST`, `KONFER_SIDES=1` (treat the file as a Konfer recording with the
+microphone and system audio on separate channels) and `KONFER_LIBRARY=real`; `RecordingSourceTests` needs
 `KONFER_RECORD_APP`; `TranslationAvailabilityTests` needs
 `KONFER_TRANSLATION=real` and Apple's language packs — it is the one suite that
 checks the recorded pair table against what macOS actually reports. Keep test
@@ -122,6 +123,21 @@ the piece nothing off the shelf provides, and it is the piece most worth testing
 Stages run in sequence, never in parallel — both saturate the Neural Engine.
 Diarization failure is survivable and marks the meeting `degraded`; ASR failure
 fails the run. Nothing partial is ever persisted, so there is no resume state.
+
+**Channels are sources.** `AudioSourcePreparer` folds every channel into one
+before anything reads the file, because `AVAudioConverter` — which FluidAudio
+and `SpeechAnalyzer` both use to reach 16 kHz mono — keeps channel 0 and drops
+the rest rather than mixing; that is why system audio was never transcribed at
+all. For Konfer's own recordings it also writes the two sides out separately
+(`PreparedAudio.sides`), diarizes each on its own, and attributes each word to
+the side that was louder while it was spoken (`SideEnvelope`,
+`SideAttribution`, `SpeakerAligner.align(words:across:envelopes:)`), so a voice
+in the room is never merged with a voice on the call. Transcription still runs
+once, over the fold: doubling diarization costs 29 s an hour, doubling ASR
+would cost ten minutes. **Whether a file has two sources is never inferred** —
+only `RecorderView` claims it (`enqueue(separatesSources:)`), and
+`Meeting.hasSeparateSources` remembers it for a re-run. See README ▸ "Two
+channels, one transcript".
 
 **Backends.** The model is derived, not chosen: `ASRBackendKind(transcribing:)`
 maps each of the ten `MeetingLanguage` cases to one of three backends — Apple

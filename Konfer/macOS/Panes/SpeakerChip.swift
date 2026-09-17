@@ -55,6 +55,15 @@ struct SpeakerChip: View {
                     .font(.callout)
                     .fontWeight(speaker.isNamed ? .semibold : .regular)
                     .foregroundStyle(speaker.isNamed ? .primary : .secondary)
+                // Which source this voice came from, when the recording kept
+                // them apart. It is knowledge rather than a guess — the two
+                // were recorded on separate channels — so it is worth saying.
+                if let side = speaker.side {
+                    Image(systemName: side.symbolName)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .help(side.displayName)
+                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
