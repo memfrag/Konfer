@@ -106,6 +106,27 @@ struct RecorderView: View {
         .disabled(controller.state.isBusy)
     }
 
+    /// Why the other side is silent, most likely cause first.
+    ///
+    /// A refused system-audio permission is the one failure that looks exactly
+    /// like a quiet call: macOS returns success from every call and hands the
+    /// tap nothing but zeros, so this banner is the only place the user can
+    /// learn that a permission is involved at all.
+    private var silenceExplanation: String {
+        switch controller.systemAudio {
+        case .app(let app):
+            "The right channel has been silent since recording started. macOS "
+            + "may have refused permission to record system audio, which it does "
+            + "without saying so — check Privacy & Security ▸ Screen & System "
+            + "Audio Recording. Otherwise, make sure \(app.name) is actually "
+            + "playing the call."
+        default:
+            "The right channel has been silent since recording started. Check "
+            + "that the call is actually playing, and that Konfer is allowed to "
+            + "record in Privacy & Security ▸ Screen & System Audio Recording."
+        }
+    }
+
     private var systemAudioBinding: Binding<SystemAudioSource> {
         Binding(
             get: { controller.systemAudio },
@@ -119,10 +140,10 @@ struct RecorderView: View {
             "Only you will be recorded."
         case .app(let app):
             "Only \(app.name) is recorded, so notifications and music stay out. "
-            + "No screen-recording permission needed."
+            + "macOS asks to allow system-audio recording the first time."
         case .everything:
             "Records every sound the Mac makes, including notifications. macOS "
-            + "asks for screen-recording permission the first time."
+            + "asks for the full screen-recording permission the first time."
         }
     }
 
@@ -161,14 +182,17 @@ struct RecorderView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Nothing is coming from the other side")
                             .font(.callout)
-                        Text(
-                            "The right channel has been silent since recording "
-                            + "started. Check that the call is actually playing, "
-                            + "or stop and choose \"Everything the Mac plays\"."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(silenceExplanation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let url = PrivacySettings.screenAndSystemAudio {
+                            Button("Open Privacy Settings…") {
+                                NSWorkspace.shared.open(url)
+                            }
+                            .buttonStyle(.link)
+                            .font(.caption)
+                        }
                     }
                     Spacer()
                 }

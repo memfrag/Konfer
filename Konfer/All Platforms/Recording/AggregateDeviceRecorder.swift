@@ -9,8 +9,17 @@ import Foundation
 /// Records the microphone together with one application's audio.
 ///
 /// A Core Audio process tap captures just that app's output — a Slack ping or
-/// music playing in another window never reaches the file — and macOS asks for
-/// no screen-recording permission for it.
+/// music playing in another window never reaches the file.
+///
+/// It is not permission-free, which this said for too long. A tap is gated
+/// behind *System Audio Recording* (`kTCCServiceAudioCapture`): a different
+/// permission from screen recording, granted in the same Settings pane, asked
+/// for by `AudioDeviceStart` rather than by creating the tap — and **denied
+/// silently**. Every call still returns `noErr`, every buffer is zeros, and the
+/// recording comes out with a silent right channel. That is why
+/// ``RecorderController`` watches the level rather than a status code, and why
+/// `NSAudioCaptureUsageDescription` has to be in `Info.plist`: without it TCC
+/// refuses without ever asking the user.
 ///
 /// Mic and tap are combined into a single *private* aggregate device rather
 /// than captured separately. That is the whole trick: one device means one

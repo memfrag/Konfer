@@ -221,8 +221,16 @@ playback highlighting and is dropped when text is hand-edited. Editing operation
 live in `Meeting+Editing.swift` and are covered by `MeetingEditingTests`.
 
 **Recording** (`All Platforms/Recording/`). `RecordingSource` has two
-implementations chosen by the user: `AggregateDeviceRecorder` (Core Audio process
-tap, no screen-recording prompt) and `ScreenCaptureRecorder` (ScreenCaptureKit).
+implementations chosen by the user: `AggregateDeviceRecorder` (Core Audio
+process tap) and `ScreenCaptureRecorder` (ScreenCaptureKit). Both need consent,
+and the difference is which: a tap asks for *System Audio Recording*
+(`kTCCServiceAudioCapture`, needs `NSAudioCaptureUsageDescription` in
+`Info.plist` — the `INFOPLIST_KEY_` build setting for it is ignored, so check
+the built bundle with `plutil -p`), ScreenCaptureKit for the full screen
+recording. Both are rows of the same Settings pane. **A refused tap is silent**:
+every call returns `noErr` and every buffer is zeros, which is why
+`RecorderController` watches the level and warns after four seconds rather than
+trusting a status code.
 Both honour the same contract — microphone on channel 0, system audio on channel 1
 via `TwoChannelWriter`. Keeping the sides apart is free while recording and
 impossible to recover afterwards.

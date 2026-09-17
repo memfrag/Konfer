@@ -116,8 +116,8 @@ final class RecorderController {
         // Only once the process itself is gone — quitting the app being
         // recorded is the one case where the choice genuinely cannot stand.
         // Falling back on silence alone would move the recording to
-        // "everything the Mac plays", which needs a screen-recording prompt
-        // the user never asked for.
+        // "everything the Mac plays", which needs the full screen-recording
+        // permission rather than the narrower one a tap asks for.
         if case .app(let chosen) = systemAudio,
            !applications.contains(where: { $0.id == chosen.id }) {
             systemAudio = applications.isEmpty ? .none : .everything

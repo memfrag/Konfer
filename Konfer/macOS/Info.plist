@@ -4,6 +4,16 @@
 <dict>
     <key>NSMicrophoneUsageDescription</key>
     <string>Konfer records your microphone so meetings can be transcribed on this Mac.</string>
+    <!-- Recording one app's audio with a Core Audio process tap is gated behind
+         System Audio Recording, which is its own permission and needs its own
+         usage description. Without this key TCC refuses the tap without ever
+         asking: every call still returns noErr and every buffer is zeros, so
+         the recording comes out with a silent right channel and nothing says
+         why. It has to live in this file — the INFOPLIST_KEY_ build setting
+         for it is ignored, and `plutil -p` on the built bundle is the only
+         proof that it made it. -->
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Konfer records the other side of a call or meeting so it can be transcribed on this Mac.</string>
     <key>SUEnableInstallerLauncherService</key>
     <true/>
     <key>SUFeedURL</key>

@@ -13,12 +13,17 @@ nonisolated enum SystemAudioSource: Hashable, Sendable {
     case none
 
     /// One application's output, via a Core Audio process tap. Notifications,
-    /// music and every other app stay out of the recording, and macOS asks for
-    /// no screen-recording permission.
+    /// music and every other app stay out of the recording.
+    ///
+    /// This still needs the user's consent. macOS gates a tap behind *System
+    /// Audio Recording* — a narrower permission than screen recording, granted
+    /// in the same Settings pane — so the difference between this and
+    /// ``everything`` is which permission is asked for, not whether one is.
     case app(AudioApplication)
 
     /// Everything the Mac plays, via ScreenCaptureKit. Simpler and gives both
-    /// sides from one stream, at the cost of a Screen Recording prompt.
+    /// sides from one stream, at the cost of the full screen-recording
+    /// permission.
     case everything
 }
 
@@ -48,8 +53,9 @@ nonisolated struct RecordingConfiguration: Sendable {
 ///
 /// Two implementations, chosen by the user rather than by us, because the
 /// trade-off is real in both directions: a process tap keeps the recording free
-/// of stray notifications and needs no screen-recording permission, while
-/// ScreenCaptureKit is simpler and hands both sides over on one clock.
+/// of stray notifications and asks only for the audio rather than for the
+/// screen, while ScreenCaptureKit is simpler and hands both sides over on one
+/// clock.
 ///
 /// Whichever is used, the contract is the same: the microphone becomes channel
 /// 0 and the system audio channel 1. Keeping them apart is the point — it is
@@ -64,6 +70,24 @@ protocol RecordingSource: Sendable {
 
     /// Stops capture and releases every system resource taken in `prepare`.
     func stop() async
+}
+
+// MARK: - Privacy
+
+/// Where macOS grants what recording needs.
+///
+/// Both recording permissions live in the same pane — screen recording and the
+/// narrower system-audio one a process tap uses are two rows of it — which is
+/// why naming the pane is not the same as naming the permission.
+nonisolated enum PrivacySettings {
+
+    static let microphone = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+    )
+
+    static let screenAndSystemAudio = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+    )
 }
 
 // MARK: - Errors
@@ -103,7 +127,8 @@ nonisolated enum RecordingError: LocalizedError {
             "Allow it in System Settings ▸ Privacy & Security ▸ Microphone."
         case .screenRecordingAccessDenied:
             "Allow it in System Settings ▸ Privacy & Security ▸ Screen & System Audio "
-            + "Recording — or record a specific app instead, which doesn't need it."
+            + "Recording — or record a single app instead, which asks only to record "
+            + "that app's audio."
         case .applicationNotPlayingAudio:
             "Start the call or play something first, then begin recording."
         default:
@@ -120,13 +145,10 @@ nonisolated enum RecordingError: LocalizedError {
     /// sitting in a Settings pane the user now has to find on their own. This
     /// banner is the only thing still pointing at it.
     var privacySettingsURL: URL? {
-        let pane: String? = switch self {
-        case .microphoneAccessDenied: "Privacy_Microphone"
-        case .screenRecordingAccessDenied: "Privacy_ScreenCapture"
+        switch self {
+        case .microphoneAccessDenied: PrivacySettings.microphone
+        case .screenRecordingAccessDenied: PrivacySettings.screenAndSystemAudio
         default: nil
-        }
-        return pane.flatMap {
-            URL(string: "x-apple.systempreferences:com.apple.preference.security?\($0)")
         }
     }
 }

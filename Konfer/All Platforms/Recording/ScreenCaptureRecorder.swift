@@ -12,10 +12,11 @@ import ScreenCaptureKit
 /// as `.audio` buffers and the microphone as `.microphone` ones — so they share
 /// a clock without any work on our part.
 ///
-/// The cost is that macOS treats system audio as screen recording, so this
-/// route asks for a permission whose wording is alarming for an audio recorder,
-/// and it picks up every other sound the machine makes. Recording a single app
-/// avoids both; neither is strictly better, which is why both exist.
+/// The cost is the full screen-recording permission, whose wording is alarming
+/// for an audio recorder, and that it picks up every other sound the machine
+/// makes. Recording a single app narrows the permission to that app's audio and
+/// keeps the other sounds out, at the price of a process tap that fails
+/// quietly; neither is strictly better, which is why both exist.
 nonisolated final class ScreenCaptureRecorder: NSObject, RecordingSource, @unchecked Sendable {
 
     private var stream: SCStream?
