@@ -58,6 +58,13 @@ struct PipelineIntegrationTests {
         ProcessInfo.processInfo.environment["KONFER_SIDES"] == "1"
     }
 
+    /// `KONFER_BLEED=1` asks for the microphone to be silenced wherever it is
+    /// only hearing the call — what the "played over speakers" box in
+    /// `ImportSheet` does.
+    nonisolated static var suppressesBleed: Bool {
+        ProcessInfo.processInfo.environment["KONFER_BLEED"] == "1"
+    }
+
     @Test(
         "Transcribes a real recording into speaker-attributed turns",
         .enabled(if: PipelineIntegrationTests.audioURL != nil),
@@ -99,7 +106,8 @@ struct PipelineIntegrationTests {
         pipeline.enqueue(
             url,
             language: Self.language,
-            separatesSources: Self.separatesSources
+            separatesSources: Self.separatesSources,
+            suppressesBleed: Self.suppressesBleed
         )
 
         var lastTick = Date()

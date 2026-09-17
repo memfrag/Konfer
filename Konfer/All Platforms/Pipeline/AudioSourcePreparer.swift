@@ -35,6 +35,11 @@ nonisolated struct PreparedAudio: Sendable {
     /// Temporary files this run created, for it to delete afterwards.
     let temporaryFiles: [URL]
 
+    /// How much of the call the microphone turned out to be hearing, when
+    /// suppression was asked for and found something to act on. Nil when it
+    /// was not asked for, or when the two sides were not tracking each other.
+    var bleed: BleedSuppression.Coupling?
+
     func cleanUp() {
         for file in temporaryFiles {
             try? FileManager.default.removeItem(at: file)
@@ -70,10 +75,17 @@ nonisolated enum AudioSourcePreparer {
     ///     field in two channels, and a pair of microphones a metre apart
     ///     correlates no better than two unrelated sources do. Claimed
     ///     wrongly, it would file one speaker's words under two speakers.
+    ///   - suppressingBleed: Whether to silence the microphone side wherever it
+    ///     is only hearing the call — see ``BleedSuppression``. The user's
+    ///     choice, not ours: it is measurable but not certain, and a recording
+    ///     where it guesses wrong is one where a quiet voice in the room was
+    ///     gated out of the *diarization* input. Only ever applied to the side
+    ///     files; the fold speech recognition reads is untouched either way.
     static func prepare(
         _ url: URL,
         trimmedTo trim: KeptRange? = nil,
-        separatingSources: Bool = false
+        separatingSources: Bool = false,
+        suppressingBleed: Bool = false
     ) async throws -> PreparedAudio {
 
         let asset = AVURLAsset(url: url)
@@ -119,7 +131,8 @@ nonisolated enum AudioSourcePreparer {
         if let derived = try derive(
             working,
             keeping: pendingRange,
-            separatingSources: separatingSources && !hasVideo
+            separatingSources: separatingSources && !hasVideo,
+            suppressingBleed: suppressingBleed
         ) {
             // Whatever it was derived from was only ever a step on the way.
             if let temporary { try? FileManager.default.removeItem(at: temporary) }
@@ -128,14 +141,113 @@ nonisolated enum AudioSourcePreparer {
             sides = derived.sides
         }
 
+        // After the sides exist and before anything reads them: diarization is
+        // the stage this protects, and it is the next one.
+        let bleed = suppressingBleed ? suppressBleed(between: sides) : nil
+
         return PreparedAudio(
             url: working,
             duration: range.map(\.duration) ?? sourceDuration,
             sourceDuration: sourceDuration,
             startOffset: range?.start ?? 0,
             sides: sides,
-            temporaryFiles: [temporary].compactMap { $0 } + sides.map(\.url)
+            temporaryFiles: [temporary].compactMap { $0 } + sides.map(\.url),
+            bleed: bleed
         )
+    }
+
+    // MARK: - Bleed
+
+    /// `KONFER_BLEED_DIAGNOSTICS=1` reports what the coupling was measured as
+    /// and how much of the microphone it silenced, which is the only way to
+    /// tell "found no bleed" apart from "found it and left it alone".
+    nonisolated static var isDiagnostic: Bool {
+        ProcessInfo.processInfo.environment["KONFER_BLEED_DIAGNOSTICS"] == "1"
+    }
+
+    /// Silences the microphone side wherever it is only hearing the call.
+    ///
+    /// Works on the side files rather than during the fold, which costs one
+    /// more read of one mono channel and buys the loudness measurement that
+    /// ``SideEnvelope`` already knows how to make. The fold is not touched: see
+    /// ``BleedSuppression``.
+    ///
+    /// - Returns: What it measured and acted on, or nil when the two sides were
+    ///   not tracking each other closely enough to call it bleed.
+    private static func suppressBleed(between sides: [PreparedSide]) -> BleedSuppression.Coupling? {
+        guard let microphone = sides.first(where: { $0.side == .microphone }),
+              let system = sides.first(where: { $0.side == .systemAudio }),
+              let microphoneEnvelope = try? SideEnvelope.measure(microphone.url, side: .microphone),
+              let systemEnvelope = try? SideEnvelope.measure(system.url, side: .systemAudio),
+              let coupling = BleedSuppression.coupling(
+                  microphone: microphoneEnvelope.frames,
+                  system: systemEnvelope.frames
+              )
+        else { return nil }
+
+        let gate = BleedSuppression.gate(
+            microphone: microphoneEnvelope.frames,
+            system: systemEnvelope.frames,
+            coupling: coupling
+        )
+        if isDiagnostic {
+            let silenced = gate.filter { $0 }.count
+            print(String(
+                format: "BLEED: %.0f%% of frames explained at %d frames (%.0f ms), %.1f dB down, "
+                    + "silencing %d of %d frames",
+                coupling.evidence * 100,
+                coupling.lag,
+                Double(coupling.lag) * SideEnvelope.frameDuration * 1000,
+                coupling.decibels,
+                silenced,
+                gate.count
+            ))
+        }
+        guard gate.contains(true) else { return coupling }
+        do {
+            try silence(gate, in: microphone.url)
+        } catch {
+            // The recording is still perfectly transcribable with the bleed in
+            // it — one invented speaker in the roster is not worth failing a
+            // run over, and the roster drops unheard clusters anyway.
+            return nil
+        }
+        return coupling
+    }
+
+    /// Rewrites a mono side file with the gated frames zeroed.
+    private static func silence(_ gate: [Bool], in url: URL) throws {
+        let input = try AVAudioFile(forReading: url)
+        let rate = input.processingFormat.sampleRate
+        let perFrame = max(1, Int(rate * SideEnvelope.frameDuration))
+        guard let format = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: rate,
+            channels: 1,
+            interleaved: false
+        ) else { return }
+
+        let scratch = temporaryURL()
+        var output: AVAudioFile? = try monoFile(at: scratch, rate: rate)
+
+        var position = 0
+        try AudioBuffers.forEach(in: input) { buffer in
+            guard let data = buffer.floatChannelData else { return }
+            let count = Int(buffer.frameLength)
+            try write(buffer.frameLength, format: format, to: output) { target in
+                target.update(from: data[0], count: count)
+                for offset in 0..<count {
+                    let frame = (position + offset) / perFrame
+                    if frame < gate.count, gate[frame] { target[offset] = 0 }
+                }
+            }
+            position += count
+        }
+        // Released before the file is moved: an `.m4a` is only valid once
+        // `AVAudioFile` has finalised its container, which it does on release.
+        output = nil
+
+        _ = try FileManager.default.replaceItemAt(url, withItemAt: scratch)
     }
 
     // MARK: - Channels
@@ -182,7 +294,8 @@ nonisolated enum AudioSourcePreparer {
     private static func derive(
         _ url: URL,
         keeping range: KeptRange?,
-        separatingSources: Bool
+        separatingSources: Bool,
+        suppressingBleed: Bool = false
     ) throws -> Derived? {
 
         // A file `AVAudioFile` cannot open is left exactly as it is: the stage

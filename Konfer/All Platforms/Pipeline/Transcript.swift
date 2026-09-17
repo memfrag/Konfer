@@ -361,6 +361,11 @@ nonisolated struct Meeting: Identifiable, Codable, Hashable, Sendable {
     /// than guessing from a file that looks like ordinary stereo.
     var hasSeparateSources: Bool?
 
+    /// Whether the run silenced the microphone wherever it was only hearing
+    /// the call. Remembered so a re-run repeats the choice rather than asking
+    /// again, like the trim and the language do.
+    var suppressedBleed: Bool?
+
     /// The transcript in another language, or nil if it was never translated.
     /// Optional so meetings written before translation existed still decode.
     var translation: TranscriptTranslation?

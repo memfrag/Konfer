@@ -36,7 +36,15 @@ struct ImportSheet: View {
     var initialLanguage: MeetingLanguage = .english
     var initialRange: KeptRange?
 
-    let onTranscribe: (MeetingLanguage, Int?, KeptRange?) -> Void
+    /// Whether this file keeps the microphone and the call on separate
+    /// channels, which is the only case where the speakers question below
+    /// means anything. Only the recorder knows — see `Meeting/hasSeparateSources`.
+    var separatesSources = false
+
+    /// Seeded on a re-run with what the first run was told.
+    var initialSuppressBleed = false
+
+    let onTranscribe: (MeetingLanguage, Int?, KeptRange?, Bool) -> Void
     var onOpenExisting: ((Meeting) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -46,6 +54,7 @@ struct ImportSheet: View {
     @State private var language: MeetingLanguage
     @State private var knowsSpeakerCount = false
     @State private var speakerCount = 4
+    @State private var suppressBleed: Bool
 
     @State private var player = PlayerController()
     @State private var waveform: Waveform?
@@ -60,7 +69,9 @@ struct ImportSheet: View {
         confirmTitle: String = "Transcribe",
         initialLanguage: MeetingLanguage = .english,
         initialRange: KeptRange? = nil,
-        onTranscribe: @escaping (MeetingLanguage, Int?, KeptRange?) -> Void,
+        separatesSources: Bool = false,
+        initialSuppressBleed: Bool = false,
+        onTranscribe: @escaping (MeetingLanguage, Int?, KeptRange?, Bool) -> Void,
         onOpenExisting: ((Meeting) -> Void)? = nil
     ) {
         self.url = url
@@ -69,10 +80,13 @@ struct ImportSheet: View {
         self.confirmTitle = confirmTitle
         self.initialLanguage = initialLanguage
         self.initialRange = initialRange
+        self.separatesSources = separatesSources
+        self.initialSuppressBleed = initialSuppressBleed
         self.onTranscribe = onTranscribe
         self.onOpenExisting = onOpenExisting
         _language = State(initialValue: initialLanguage)
         _range = State(initialValue: initialRange)
+        _suppressBleed = State(initialValue: initialSuppressBleed)
     }
 
     var body: some View {
@@ -123,6 +137,26 @@ struct ImportSheet: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                // Asked rather than measured. The bleed is measurable — see
+                // `BleedSuppression` — but acting on it means ignoring parts of
+                // the microphone, and whether the call came out of the speakers
+                // is something the user simply knows.
+                if separatesSources {
+                    Toggle("The call came out of the speakers", isOn: $suppressBleed)
+                    Text(
+                        suppressBleed
+                        ? "Konfer will ignore the microphone wherever only the call "
+                          + "is audible on it, so the people on the call aren't also "
+                          + "listed as being in the room."
+                        : "Turn this on if you weren't wearing headphones. The "
+                          + "microphone hears the call too, and the far end can end "
+                          + "up listed as someone in the room."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .formStyle(.grouped)
 
@@ -131,7 +165,12 @@ struct ImportSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(confirmTitle) {
-                    onTranscribe(language, knowsSpeakerCount ? speakerCount : nil, trim)
+                    onTranscribe(
+                        language,
+                        knowsSpeakerCount ? speakerCount : nil,
+                        trim,
+                        separatesSources && suppressBleed
+                    )
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -319,7 +358,8 @@ struct ImportSheet: View {
 #Preview {
     ImportSheet(
         url: URL(fileURLWithPath: "/tmp/Standup.m4a"),
-        onTranscribe: { _, _, _ in }
+        separatesSources: true,
+        onTranscribe: { _, _, _, _ in }
     )
     .previewEnvironment()
 }

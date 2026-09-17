@@ -57,6 +57,15 @@ final class RecorderController {
     /// window has, so it is called out while there is still time to restart.
     private(set) var systemAudioSeemsSilent = false
 
+    /// Set once the microphone is audibly picking up the call as well.
+    ///
+    /// Measured rather than assumed — see ``BleedSuppression`` — and latched:
+    /// the recording already contains the bleed by the time this is true, and a
+    /// banner that came and went with the conversation would be noise. Worth
+    /// saying while the recording is still going, because headphones fix it and
+    /// nothing else fixes it as well.
+    private(set) var microphoneHearsTheCall = false
+
     /// Set when a recording finishes, so the window can offer to transcribe it.
     private(set) var finishedRecording: URL?
 
@@ -68,6 +77,16 @@ final class RecorderController {
     @ObservationIgnored private var meterTask: Task<Void, Never>?
     @ObservationIgnored private var outputURL: URL?
     @ObservationIgnored private var systemEverHadSignal = false
+
+    /// Meter samples kept for the bleed measurement, oldest first.
+    @ObservationIgnored private var microphoneHistory: [Float] = []
+    @ObservationIgnored private var systemHistory: [Float] = []
+
+    /// Meter ticks the measurement runs over. At 80 ms a tick, 150 is twelve
+    /// seconds — long enough to hold several of the far end's sentences, which
+    /// is what the measurement needs, and short enough to notice inside the
+    /// first minute of a call.
+    private static let bleedWindow = 150
 
     init(destinationFolder: URL) {
         self.destinationFolder = destinationFolder
@@ -153,6 +172,9 @@ final class RecorderController {
         finishedRecording = nil
         systemAudioSeemsSilent = false
         systemEverHadSignal = false
+        microphoneHearsTheCall = false
+        microphoneHistory = []
+        systemHistory = []
         state = .preparing
 
         let url = destinationFolder.appendingPathComponent(sanitisedFilename)
@@ -235,6 +257,7 @@ final class RecorderController {
                 self.systemLevel = max(levels.system, self.systemLevel * 0.6)
 
                 if levels.system > 0 { self.systemEverHadSignal = true }
+                self.watchForBleed(levels)
                 if case .recording(let startedAt) = self.state,
                    self.systemAudio != .none,
                    !self.systemEverHadSignal,
@@ -248,6 +271,32 @@ final class RecorderController {
                 }
             }
         }
+    }
+
+    /// Watches for the call arriving on the microphone as well as on its own
+    /// channel.
+    ///
+    /// Runs on the meter's own samples rather than a second read of the audio:
+    /// a peak squared is an energy proxy, and energy per frame is exactly what
+    /// ``BleedSuppression`` measures. The frames are 80 ms rather than the
+    /// 20 ms used on a finished recording, which loses the lag — it comes out
+    /// as zero — and keeps the only thing being asked here, which is whether
+    /// the microphone rises and falls with the call.
+    private func watchForBleed(_ levels: (microphone: Float, system: Float)) {
+        guard !microphoneHearsTheCall, recordsMicrophone, systemAudio != .none else { return }
+
+        microphoneHistory.append(levels.microphone * levels.microphone)
+        systemHistory.append(levels.system * levels.system)
+        if microphoneHistory.count > Self.bleedWindow {
+            microphoneHistory.removeFirst()
+            systemHistory.removeFirst()
+        }
+        guard microphoneHistory.count == Self.bleedWindow else { return }
+
+        microphoneHearsTheCall = BleedSuppression.coupling(
+            microphone: microphoneHistory,
+            system: systemHistory
+        ) != nil
     }
 
     // MARK: - Naming

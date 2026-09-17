@@ -44,7 +44,8 @@ TEST_RUNNER_KONFER_AUDIO=/path/to/meeting.wav \
 
 `PipelineIntegrationTests` also reads `KONFER_BACKEND`, `KONFER_LANGUAGE`,
 `KONFER_FAST`, `KONFER_SIDES=1` (treat the file as a Konfer recording with the
-microphone and system audio on separate channels) and `KONFER_LIBRARY=real`; `RecordingSourceTests` needs
+microphone and system audio on separate channels), `KONFER_BLEED=1` (silence the
+microphone where it is only hearing the call) and `KONFER_LIBRARY=real`; `RecordingSourceTests` needs
 `KONFER_RECORD_APP`; `TranslationAvailabilityTests` needs
 `KONFER_TRANSLATION=real` and Apple's language packs — it is the one suite that
 checks the recorded pair table against what macOS actually reports. Keep test
@@ -55,6 +56,8 @@ Runtime overrides for experiments: `KONFER_BACKEND` (forces a model, including
 the otherwise unreachable `kb-whisper-small`), `KONFER_CHUNKING=vad`,
 `KONFER_SLICES=1`,
 `KONFER_WHISPER_VERBOSE=1`, `KONFER_VAD_PADDING`, `KONFER_RECORD_DIAGNOSTICS=1`,
+`KONFER_BLEED_DIAGNOSTICS=1` (what the bleed measurement found and how much of
+the microphone it silenced),
 `KONFER_TRANSLATE_CHUNK` (how many translated lines are written through at a
 time), and `APP_ENVIRONMENT=mock` to launch against `AppEnvironment.mock()`.
 
@@ -213,6 +216,21 @@ mutation. Audio is never copied: a `Meeting` holds `audioPath`, so a meeting who
 recording moved still opens read-only. `WaveformStore` caches envelopes beside the
 transcript. `SpeakerStore` holds cross-meeting voice enrollment and only ever
 *suggests* a name — never applies one automatically.
+
+**A call on speakers reaches the microphone.** Measured on a Mac Studio — its
+own speakers, a USB microphone a desk away — the bleed arrives 43 dB below the
+digital copy with a 20 ms lag. Far too quiet to fool attribution, and still loud
+enough that the microphone side's diarization pass clusters it: the far end comes
+back as a person standing in the room, carrying their voice as its embedding.
+Two independent answers, because they fix different halves. `makeSpeakerLabels`
+drops clusters no turn was attributed to, which is what that phantom always is.
+And `BleedSuppression` — **the user's explicit choice in `ImportSheet`**, never
+inferred — silences the microphone side wherever it holds nothing but the call,
+before diarization reads it; `RecorderController` measures the same coupling live
+off the meter samples and says so while there is still time to put headphones on.
+It is not echo cancellation and does not pretend to be: nothing is subtracted, so
+double-talk is left exactly as it was, and the fold speech recognition reads is
+never touched — a gate that misjudged a frame would otherwise be a missing word.
 
 **Transcript model** (`Pipeline/Transcript.swift`). An `Utterance` carries a
 `speakerId` into the meeting's `SpeakerLabel` roster rather than a name, which is

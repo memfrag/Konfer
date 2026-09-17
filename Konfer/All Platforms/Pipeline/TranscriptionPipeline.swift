@@ -39,6 +39,12 @@ final class TranscriptionPipeline {
         /// ``AudioSourcePreparer/prepare(_:trimmedTo:separatingSources:)``.
         let separatesSources: Bool
 
+        /// Whether to silence the microphone side where it is only hearing the
+        /// call, before diarization reads it — see ``BleedSuppression``. Asked
+        /// for explicitly, never assumed: it is the user who knows whether they
+        /// were on speakers.
+        let suppressesBleed: Bool
+
         /// The meeting this run replaces, when it is a re-run rather than an
         /// import. A failed or garbled transcript is worth another attempt on a
         /// narrower range, and it should land back on the same row in the
@@ -131,7 +137,8 @@ final class TranscriptionPipeline {
         trim: KeptRange? = nil,
         replacing: UUID? = nil,
         title: String? = nil,
-        separatesSources: Bool = false
+        separatesSources: Bool = false,
+        suppressesBleed: Bool = false
     ) {
         let job = Job(
             sourceURL: url,
@@ -142,6 +149,7 @@ final class TranscriptionPipeline {
             fastTranscription: fastTranscription,
             trim: trim,
             separatesSources: separatesSources,
+            suppressesBleed: suppressesBleed,
             replacing: replacing
         )
         queue.append(job)
@@ -219,7 +227,8 @@ final class TranscriptionPipeline {
             let audio = try await AudioSourcePreparer.prepare(
                 job.sourceURL,
                 trimmedTo: job.trim,
-                separatingSources: job.separatesSources
+                separatingSources: job.separatesSources,
+                suppressingBleed: job.suppressesBleed
             )
             prepared = audio
             try checkCancellation()
@@ -305,7 +314,7 @@ final class TranscriptionPipeline {
                 ),
                 by: audio.startOffset
             )
-            let speakers = makeSpeakerLabels(sides: sides, utterances: utterances)
+            let speakers = Self.makeSpeakerLabels(sides: sides, utterances: utterances)
             let cuts = transcribed.sliceCuts.map { $0 + audio.startOffset }
 
             if let replacing = job.replacing, var existing = meetingStore.meeting(replacing) {
@@ -318,6 +327,7 @@ final class TranscriptionPipeline {
                 existing.sliceCuts = cuts.isEmpty ? nil : cuts
                 existing.wasFastTranscribed = job.fastTranscription ? true : nil
                 existing.hasSeparateSources = job.separatesSources ? true : nil
+                existing.suppressedBleed = job.suppressesBleed ? true : nil
                 existing.duration = audio.sourceDuration
 
                 // The language the re-run was told to use, which may not be
@@ -350,7 +360,8 @@ final class TranscriptionPipeline {
                     // outside the range, so there is nothing to collapse.
                     keptRange: nil,
                     wasFastTranscribed: job.fastTranscription ? true : nil,
-                    hasSeparateSources: job.separatesSources ? true : nil
+                    hasSeparateSources: job.separatesSources ? true : nil,
+                    suppressedBleed: job.suppressesBleed ? true : nil
                 )
                 meetingStore.add(meeting)
                 lastFinishedMeetingID = meeting.id
@@ -459,7 +470,20 @@ final class TranscriptionPipeline {
     /// happened to assign first. Numbering runs across the sides rather than
     /// within each: the roster is one list of people, and which side each of
     /// them was on is carried by the label, not by their number.
-    private func makeSpeakerLabels(
+    ///
+    /// A cluster no turn was attributed to is not a person and is left out.
+    /// The microphone side of a call played over speakers is the case that
+    /// matters: it hears the far end, the diarizer clusters what it hears, and
+    /// attribution then correctly files every one of those words on the call —
+    /// leaving a cluster with a name, a duration and an embedding of somebody
+    /// else's voice that nothing in the transcript points at. Measured, the
+    /// bleed reaching a Mac Studio's own microphone from its speakers sits 43 dB
+    /// below the digital copy and is still clustered, so this is one invented
+    /// person "in the room" in an ordinary speakerphone call. Dropping them
+    /// before the numbering pass keeps the rest Speaker 1 upwards with no gap,
+    /// and keeps them out of `SpeakerStore`, which would otherwise be offered a
+    /// far-end voice to enroll as someone in the room.
+    nonisolated static func makeSpeakerLabels(
         sides: [DiarizedSide],
         utterances: [Utterance]
     ) -> [SpeakerLabel] {
@@ -468,8 +492,10 @@ final class TranscriptionPipeline {
         var grouped: [String: [TimedSpeakerSegment]] = [:]
         var sideOfSpeaker: [String: RecordingSide] = [:]
 
+        let heard = Set(utterances.map(\.speakerId))
         let all = sides
             .flatMap { side in side.segments.map { (side.side, $0) } }
+            .filter { heard.contains($0.1.speakerId) }
             .sorted { $0.1.startTimeSeconds < $1.1.startTimeSeconds }
 
         for (side, segment) in all {

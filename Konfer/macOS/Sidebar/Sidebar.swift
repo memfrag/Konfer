@@ -56,7 +56,9 @@ struct Sidebar: View {
         .sheet(item: $pending) { pending in
             switch pending {
             case .recording(let url, let alreadyTranscribed):
-                ImportSheet(url: url, alreadyTranscribed: alreadyTranscribed) { language, speakers, trim in
+                // An imported file has no known channel layout, so it is never
+                // two-sided and the speakers question does not apply.
+                ImportSheet(url: url, alreadyTranscribed: alreadyTranscribed) { language, speakers, trim, _ in
                     pipeline.enqueue(
                         url,
                         language: language,

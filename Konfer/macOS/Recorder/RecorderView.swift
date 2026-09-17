@@ -43,16 +43,21 @@ struct RecorderView: View {
             get: { controller.finishedRecording.map(FinishedRecording.init) },
             set: { if $0 == nil { controller.acknowledgeFinishedRecording() } }
         )) { finished in
-            ImportSheet(url: finished.url) { language, speakers, trim in
+            ImportSheet(
+                url: finished.url,
+                // Konfer wrote this file, so the two channels are known to be
+                // the microphone and system audio rather than a stereo image.
+                // Nothing else can tell the pipeline that — and it is also what
+                // makes the speakers question worth asking.
+                separatesSources: true
+            ) { language, speakers, trim, suppressBleed in
                 pipeline.enqueue(
                     finished.url,
                     language: language,
                     expectedSpeakers: speakers,
                     trim: trim,
-                    // Konfer wrote this file, so the two channels are known to
-                    // be the microphone and system audio rather than a stereo
-                    // image. Nothing else can tell the pipeline that.
-                    separatesSources: true
+                    separatesSources: true,
+                    suppressesBleed: suppressBleed
                 )
             }
         }
@@ -230,6 +235,30 @@ struct RecorderView: View {
                             .buttonStyle(.link)
                             .font(.caption)
                         }
+                    }
+                    Spacer()
+                }
+                .padding(10)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            if controller.microphoneHearsTheCall {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "headphones")
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("The microphone is picking up the call")
+                            .font(.callout)
+                        Text(
+                            "Headphones would keep the two sides apart. Without "
+                            + "them, the people on the call can end up listed as "
+                            + "being in the room — say the call came out of the "
+                            + "speakers when you transcribe this, and Konfer will "
+                            + "ignore the microphone where only the call is audible."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
                 }

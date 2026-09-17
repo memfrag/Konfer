@@ -118,8 +118,12 @@ struct MeetingPane: View {
                     // Seeded with the trim, which is the point: a run that
                     // failed or came back as noise is worth retrying on the
                     // stretch that is actually speech.
-                    initialRange: meeting.keptRange
-                ) { language, speakers, trim in
+                    initialRange: meeting.keptRange,
+                    // What the first run knew about the file, rather than what
+                    // a second look at it would guess.
+                    separatesSources: meeting.hasSeparateSources ?? false,
+                    initialSuppressBleed: meeting.suppressedBleed ?? false
+                ) { language, speakers, trim, suppressBleed in
                     pipeline.enqueue(
                         meeting.audioURL,
                         language: language,
@@ -127,9 +131,8 @@ struct MeetingPane: View {
                         trim: trim,
                         replacing: meeting.id,
                         title: meeting.title,
-                        // What the first run knew about the file, rather than
-                        // what a second look at it would guess.
-                        separatesSources: meeting.hasSeparateSources ?? false
+                        separatesSources: meeting.hasSeparateSources ?? false,
+                        suppressesBleed: suppressBleed
                     )
                 }
             }
