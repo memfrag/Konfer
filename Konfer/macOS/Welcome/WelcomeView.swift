@@ -63,7 +63,7 @@ struct WelcomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack {
-                Text("You can change this later in Settings ▸ Models.")
+                Text("You can download more later from Window ▸ Models.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()

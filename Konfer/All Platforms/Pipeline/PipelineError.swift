@@ -51,7 +51,8 @@ nonisolated enum PipelineError: LocalizedError {
         case .noAudioTrack:
             "Choose a file that contains audio."
         case .appleSpeechUnavailable:
-            "Choose KB-Whisper in Settings ▸ Transcription instead."
+            "Transcribe the recording again and choose Whisper Large v3 as "
+            + "the model. It runs in Konfer rather than in macOS."
         case .languageUnsupported:
             "Konfer has no model for that language."
         case .modelNotDownloaded(let model):
