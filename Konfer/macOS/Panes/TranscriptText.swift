@@ -12,7 +12,7 @@ import SwiftUI
 /// something a person would think of as a word — you never end up clicking a
 /// lone comma, and the layout doesn't have to reason about which gaps get a
 /// space.
-struct WordToken: Identifiable {
+struct WordToken: Identifiable, Equatable {
 
     /// Index of the token's first `WordSpan`, which also identifies it.
     let id: Int
@@ -91,6 +91,12 @@ struct WordToken: Identifiable {
 
 /// Transcript text where clicking a word moves the playhead to it.
 ///
+/// One `Text` per turn, with the words found again afterwards in its layout.
+/// It used to be one view per word, each with its own hover, tap and popover,
+/// which made a screenful of transcript a few thousand views. Measured on five
+/// real meetings in a debug build: building the list fell from 190 ms to 90,
+/// and the frame that tears the previous meeting's down from 100 ms to 63.
+///
 /// Text is deliberately not selectable here. Dragging to select and clicking to
 /// seek are the same gesture, and seeking is what you want ninety-nine times
 /// out of a hundred while checking a transcript against the audio. Selection
@@ -114,42 +120,78 @@ struct TranscriptText: View {
     /// Splits the turn before the word at this index.
     let onSplitBefore: (Int) -> Void
 
-    @State private var hovered: Int?
+    @State private var hovered: WordToken.ID?
 
     /// The token whose popover is open, if any.
     @State private var actionToken: WordToken.ID?
 
     var body: some View {
-        WrappingLines(spacing: 0, lineSpacing: 2) {
-            ForEach(tokens) { token in
-                Text(token.text)
-                    .foregroundStyle(isActive(token) ? Color.accentColor : .primary)
-                    .padding(.horizontal, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(background(for: token))
-                    )
-                    .contentShape(Rectangle())
-                    .onHover { isInside in
-                        hovered = isInside ? token.id : (hovered == token.id ? nil : hovered)
+        // Equatable, so that the pointer crossing a word redraws a highlight
+        // rather than laying the whole turn out again.
+        let string = TokenString(tokens)
+        TokenText(tokens: string, activeTokenID: activeTokenID)
+            .equatable()
+            .backgroundPreferenceValue(Text.LayoutKey.self) { layouts in
+                let highlights = highlights
+                if !highlights.isEmpty {
+                    GeometryReader { proxy in
+                        let frames = TokenFrames(layouts, of: string, in: proxy)
+                        Canvas { context, _ in
+                            for (id, color) in highlights {
+                                for rect in frames[id] {
+                                    context.fill(
+                                        Path(roundedRect: rect, cornerRadius: 3),
+                                        with: .color(color)
+                                    )
+                                }
+                            }
+                        }
                     }
-                    .onTapGesture {
-                        onSeek(token.start)
-                        actionToken = offersActions ? token.id : nil
-                    }
-                    .popover(
-                        isPresented: Binding(
-                            get: { actionToken == token.id },
-                            set: { if !$0, actionToken == token.id { actionToken = nil } }
-                        ),
-                        arrowEdge: .bottom
-                    ) {
-                        actions(at: token)
-                    }
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityHint("Play from here")
+                }
             }
-        }
+            .overlayPreferenceValue(Text.LayoutKey.self) { layouts in
+                GeometryReader { proxy in
+                    interaction(TokenFrames(layouts, of: string, in: proxy))
+                }
+            }
+    }
+
+    /// Where the pointer and the clicks go.
+    ///
+    /// A clear layer over the text rather than gestures on the text itself,
+    /// because only here are the words' frames at hand to say which one was
+    /// hit — and it is one popover for the turn instead of one per word.
+    private func interaction(_ frames: TokenFrames) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                let id: WordToken.ID? = switch phase {
+                case .active(let location): frames.token(at: location)
+                case .ended: nil
+                }
+                if id != hovered { hovered = id }
+            }
+            .onTapGesture { location in
+                guard let id = frames.token(at: location),
+                      let token = tokens.first(where: { $0.id == id })
+                else { return }
+                onSeek(token.start)
+                actionToken = offersActions ? id : nil
+            }
+            .popover(
+                isPresented: Binding(
+                    get: { actionToken != nil },
+                    set: { if !$0 { actionToken = nil } }
+                ),
+                attachmentAnchor: .rect(.rect(actionToken.flatMap { frames[$0].first } ?? .zero)),
+                arrowEdge: .bottom
+            ) {
+                if let token = tokens.first(where: { $0.id == actionToken }) {
+                    actions(at: token)
+                }
+            }
+            // The text underneath is what an assistive app should read.
+            .accessibilityHidden(true)
     }
 
     /// What can be done at the word just clicked.
@@ -183,22 +225,31 @@ struct TranscriptText: View {
         .frame(minWidth: 180)
     }
 
-    private func isActive(_ token: WordToken) -> Bool {
-        guard let activeWordIndex else { return false }
-        return token.range.contains(activeWordIndex)
+    private var activeTokenID: WordToken.ID? {
+        guard let activeWordIndex else { return nil }
+        return tokens.first { $0.range.contains(activeWordIndex) }?.id
     }
 
+    /// The tokens drawn with a background, and in what.
+    ///
     /// Search matches tint whole tokens rather than the exact characters: a
     /// token is one clickable thing, and half of one lit is harder to read
     /// than all of it.
-    private func background(for token: WordToken) -> Color {
-        if let currentSearchMatch, covers(token, currentSearchMatch) {
-            return .orange.opacity(0.55)
+    private var highlights: [(WordToken.ID, Color)] {
+        var highlights: [(WordToken.ID, Color)] = []
+        if !searchMatches.isEmpty {
+            for token in tokens {
+                if let currentSearchMatch, covers(token, currentSearchMatch) {
+                    highlights.append((token.id, .orange.opacity(0.55)))
+                } else if searchMatches.contains(where: { covers(token, $0) }) {
+                    highlights.append((token.id, .yellow.opacity(0.35)))
+                }
+            }
         }
-        if searchMatches.contains(where: { covers(token, $0) }) {
-            return .yellow.opacity(0.35)
+        if let hovered, !highlights.contains(where: { $0.0 == hovered }) {
+            highlights.append((hovered, Color.primary.opacity(0.08)))
         }
-        return hovered == token.id ? Color.primary.opacity(0.08) : .clear
+        return highlights
     }
 
     /// Whether a match falls anywhere in the characters this token covers.
@@ -208,69 +259,158 @@ struct TranscriptText: View {
     }
 }
 
-// MARK: - Wrapping layout
+// MARK: - Token string
 
-/// Lays subviews out left to right, wrapping to a new line when they run out
-/// of width — what `Text` does for itself, but for views that need their own
-/// hit testing.
-struct WrappingLines: Layout {
+/// A turn's words laid end to end, and where each one landed.
+///
+/// One string rather than a `Text` per word interpolated together: resolving
+/// that interpolation scans it as a localization format and builds an
+/// attributed string per word, which measured as costly as the separate views
+/// it replaced.
+private struct TokenString: Equatable {
 
-    var spacing: CGFloat = 4
-    var lineSpacing: CGFloat = 3
+    let string: String
+    let ids: [WordToken.ID]
 
-    func sizeThatFits(
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout Void
-    ) -> CGSize {
-        arrange(subviews: subviews, maxWidth: proposal.width ?? .infinity).size
-    }
+    /// Each token's place in ``string``, in UTF-16 code units — the unit
+    /// `Text.Layout` counts characters in.
+    let ranges: [Range<Int>]
 
-    func placeSubviews(
-        in bounds: CGRect,
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout Void
-    ) {
-        let arrangement = arrange(subviews: subviews, maxWidth: bounds.width)
-        for (index, subview) in subviews.enumerated() {
-            let origin = arrangement.origins[index]
-            subview.place(
-                at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y),
-                proposal: .unspecified
-            )
-        }
-    }
-
-    private func arrange(
-        subviews: Subviews,
-        maxWidth: CGFloat
-    ) -> (origins: [CGPoint], size: CGSize) {
-
-        var origins: [CGPoint] = []
-        origins.reserveCapacity(subviews.count)
-
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        var widestLine: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-
-            if x > 0, x + size.width > maxWidth {
-                widestLine = max(widestLine, x - spacing)
-                x = 0
-                y += lineHeight + lineSpacing
-                lineHeight = 0
+    init(_ tokens: [WordToken]) {
+        var string = ""
+        var ranges: [Range<Int>] = []
+        var offset = 0
+        var end = 0
+        for token in tokens {
+            // The gap `WordToken.tokens` left between the two, which is the
+            // same joining rule the turn's text was built with.
+            let gap = token.textRange.lowerBound - end
+            if gap > 0 {
+                string += String(repeating: " ", count: gap)
+                offset += gap
             }
-
-            origins.append(CGPoint(x: x, y: y))
-            x += size.width + spacing
-            lineHeight = max(lineHeight, size.height)
+            string += token.text
+            let length = token.text.utf16.count
+            ranges.append(offset..<(offset + length))
+            offset += length
+            end = token.textRange.upperBound
         }
+        self.string = string
+        self.ids = tokens.map(\.id)
+        self.ranges = ranges
+    }
 
-        widestLine = max(widestLine, x - spacing)
-        return (origins, CGSize(width: max(widestLine, 0), height: y + lineHeight))
+    /// The token at a UTF-16 offset, or nil in the space between two.
+    func token(at offset: Int) -> WordToken.ID? {
+        var low = 0
+        var high = ranges.count
+        while low < high {
+            let middle = (low + high) / 2
+            if ranges[middle].upperBound <= offset {
+                low = middle + 1
+            } else {
+                high = middle
+            }
+        }
+        guard low < ranges.count, ranges[low].contains(offset) else { return nil }
+        return ids[low]
+    }
+
+    func range(of id: WordToken.ID) -> Range<Int>? {
+        ids.firstIndex(of: id).map { ranges[$0] }
+    }
+}
+
+// MARK: - Token text
+
+/// The turn as a single `Text`, with the word being spoken in the accent
+/// colour.
+private struct TokenText: View, Equatable {
+
+    let tokens: TokenString
+    let activeTokenID: WordToken.ID?
+
+    var body: some View {
+        text
+            .lineSpacing(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var text: Text {
+        guard let activeTokenID, let range = tokens.range(of: activeTokenID) else {
+            return Text(verbatim: tokens.string)
+        }
+        let string = tokens.string
+        let lower = String.Index(utf16Offset: range.lowerBound, in: string)
+        let upper = String.Index(utf16Offset: range.upperBound, in: string)
+        var active = AttributedString(string[lower..<upper])
+        active.foregroundColor = .accentColor
+        return Text(
+            AttributedString(string[..<lower]) + active + AttributedString(string[upper...])
+        )
+    }
+}
+
+// MARK: - Token frames
+
+/// Where each token was drawn, read back out of the text's layout.
+private struct TokenFrames {
+
+    /// Usually one rectangle; more when a word too long for the line wraps.
+    private var rects: [WordToken.ID: [CGRect]] = [:]
+
+    init(_ layouts: Text.LayoutKey.Value, of tokens: TokenString, in proxy: GeometryProxy) {
+        for anchored in layouts {
+            let origin = proxy[anchored.origin]
+
+            // `CharacterIndex` keeps its offset to itself, so offsets are
+            // measured from the lowest index in the layout — the first
+            // character, which always gets a glyph slice even when it draws
+            // nothing.
+            var glyphs: [(line: Int, index: Text.Layout.CharacterIndex, rect: CGRect)] = []
+            for (number, line) in anchored.layout.enumerated() {
+                for run in line {
+                    for glyph in run {
+                        guard let index = glyph.characterIndices.first else { continue }
+                        glyphs.append((number, index, glyph.typographicBounds.rect))
+                    }
+                }
+            }
+            guard let base = glyphs.map(\.index).min() else { continue }
+
+            // Consecutive glyphs of one token on one line become one rectangle.
+            var current: (id: WordToken.ID, line: Int, rect: CGRect)?
+            func close() {
+                guard let current else { return }
+                // Widened into the spaces either side, so the highlight has a
+                // margin and a click between two words still lands on one.
+                let rect = current.rect
+                    .offsetBy(dx: origin.x, dy: origin.y)
+                    .insetBy(dx: -2, dy: 0)
+                rects[current.id, default: []].append(rect)
+            }
+            for glyph in glyphs {
+                guard let id = tokens.token(at: base.distance(to: glyph.index)) else {
+                    close()
+                    current = nil
+                    continue
+                }
+                if let open = current, open.id == id, open.line == glyph.line {
+                    current?.rect = open.rect.union(glyph.rect)
+                } else {
+                    close()
+                    current = (id, glyph.line, glyph.rect)
+                }
+            }
+            close()
+        }
+    }
+
+    subscript(id: WordToken.ID) -> [CGRect] {
+        rects[id] ?? []
+    }
+
+    func token(at point: CGPoint) -> WordToken.ID? {
+        rects.first { $0.value.contains { $0.contains(point) } }?.key
     }
 }
