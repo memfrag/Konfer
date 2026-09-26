@@ -364,9 +364,10 @@ xcodebuild -scheme "Konfer (Debug)" test
 ```
 
 The app is **not** sandboxed, so the library can reference recordings wherever
-they live. Transcripts persist as one JSON file per meeting in
-`~/Library/Application Support/Konfer/Meetings/`; audio is never copied, so a
-meeting whose recording has moved still opens — read-only, with playback off.
+they live. Transcripts persist as one JSON file per meeting, named after its
+title, in folders under `~/Library/Application Support/Konfer/Meetings/` — real
+directories, so they can be rearranged in Finder too. Audio is never copied, so
+a meeting whose recording has moved still opens — read-only, with playback off.
 
 ### End-to-end check
 

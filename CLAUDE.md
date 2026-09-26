@@ -210,9 +210,14 @@ four pairs macOS refuses (sv↔pl, da↔pl); they are refused rather than pivote
 through English. `SubtitleExporter.redistribute` spreads a translated turn
 across the cues its original was cut into, so no time is ever invented.
 
-**Persistence.** `MeetingStore` is one JSON file per meeting under
-`~/Library/Application Support/Konfer/Meetings/`, write-through on every
-mutation. Audio is never copied: a `Meeting` holds `audioPath`, so a meeting whose
+**Persistence.** `MeetingStore` is one JSON file per meeting, named after its
+title, in real folders under `~/Library/Application Support/Konfer/Meetings/`,
+write-through on every mutation. A meeting's folder is wherever its file is —
+nothing about it is stored in the transcript — so filing in Finder works and
+old transcripts decode unchanged. Files were once named `<UUID>.json`; loading
+renames those after their titles, and only those, so a name given in Finder
+sticks. The store picks free names by asking the disk, never its own list,
+because it skips files it can't decode and must never write over one. Audio is never copied: a `Meeting` holds `audioPath`, so a meeting whose
 recording moved still opens read-only. `WaveformStore` caches envelopes beside the
 transcript. `SpeakerStore` holds cross-meeting voice enrollment and only ever
 *suggests* a name — never applies one automatically.
