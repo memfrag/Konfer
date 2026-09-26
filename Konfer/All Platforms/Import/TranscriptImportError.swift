@@ -4,7 +4,8 @@
 
 import Foundation
 
-/// Failures importing a transcript another app produced.
+/// Failures importing a finished transcript — Konfer's own JSON export, or
+/// one the Klang app produced.
 ///
 /// Kept apart from ``PipelineError``: an import runs no models, touches no
 /// audio and cannot be cancelled, so none of that vocabulary applies and
@@ -31,8 +32,9 @@ nonisolated enum TranscriptImportError: LocalizedError {
         case .unreadable:
             "The file may have moved, or may not be readable."
         case .unrecognizedFormat:
-            "Konfer imports the JSON transcripts the Klang app exports. To "
-            + "transcribe a recording instead, drop the audio or video file."
+            "Konfer imports its own JSON exports and the JSON transcripts the "
+            + "Klang app exports. To transcribe a recording instead, drop the "
+            + "audio or video file."
         case .noSpeech:
             "Every line in the file is empty."
         }

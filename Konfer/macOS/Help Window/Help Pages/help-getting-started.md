@@ -14,7 +14,7 @@ The welcome window asks **Which languages do you record in?** Some languages are
 
 - **Record a meeting.** Choose **File ▸ New Recording…** (⇧⌘R). See [Recording a Meeting](konfer-help:recording).
 - **Transcribe a file you already have.** Drop an audio or video file, or a voice memo, onto the Konfer window. See [Transcribing a File](konfer-help:transcribing).
-- **Import a transcript from Klang.** Drop the JSON file Klang exports onto the window. Nothing needs to be transcribed, so it arrives at once, without playback until you point it at its recording.
+- **Import a transcript.** Drop a JSON transcript onto the window: one Konfer exported, or one from the Klang app. Nothing needs to be transcribed, so it arrives at once, without playback until you point it at its recording. See [Exporting](konfer-help:exporting).
 
 ## What happens next
 

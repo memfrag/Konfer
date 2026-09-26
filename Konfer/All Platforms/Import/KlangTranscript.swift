@@ -65,21 +65,26 @@ nonisolated extension KlangTranscript {
         let texts: [Text]
     }
 
-    /// Decodes a Klang export, rejecting anything that isn't one.
-    ///
-    /// Klang's own files come ordered, non-overlapping and complete. The
-    /// tidying below is for the one that has been through somebody's editor on
-    /// the way here: an out-of-order span would put the transcript out of
-    /// sequence, and a reversed one would describe a turn that ends before it
-    /// starts.
+    /// Reads and decodes a Klang export, rejecting anything that isn't one.
     static func read(contentsOf url: URL) throws -> KlangTranscript {
-
         let data: Data
         do {
             data = try Data(contentsOf: url)
         } catch {
             throw TranscriptImportError.unreadable(url, underlying: error)
         }
+        return try decode(data, from: url)
+    }
+
+    /// The same, for a file already read — ``ImportedTranscript`` reads it
+    /// once and offers it to each format in turn.
+    ///
+    /// Klang's own files come ordered, non-overlapping and complete. The
+    /// tidying below is for the one that has been through somebody's editor on
+    /// the way here: an out-of-order span would put the transcript out of
+    /// sequence, and a reversed one would describe a turn that ends before it
+    /// starts.
+    static func decode(_ data: Data, from url: URL) throws -> KlangTranscript {
 
         guard let file = try? JSONDecoder().decode(File.self, from: data) else {
             throw TranscriptImportError.unrecognizedFormat(url)

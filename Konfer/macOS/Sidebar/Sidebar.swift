@@ -705,7 +705,7 @@ struct Sidebar: View {
         // what is in the file has nothing to confirm, and a file that isn't a
         // transcript should say so instead of opening one.
         do {
-            pending = .transcript(url, try KlangTranscript.read(contentsOf: url), folder: folder)
+            pending = .transcript(url, try ImportedTranscript.read(contentsOf: url), folder: folder)
         } catch let error as TranscriptImportError {
             importError = error
         } catch {
@@ -715,19 +715,13 @@ struct Sidebar: View {
 
     /// Files a finished transcript as a meeting and selects it, the way the
     /// pipeline's own output is selected when a run finishes.
-    ///
-    /// The title comes from the filename, exactly as a recording's does: a
-    /// meeting has no other name, and no way to be given one afterwards.
     private func importTranscript(
-        _ transcript: KlangTranscript,
+        _ transcript: ImportedTranscript,
         from url: URL,
         language: MeetingLanguage,
         folder: MeetingFolder
     ) {
-        let meeting = transcript.meeting(
-            title: url.deletingPathExtension().lastPathComponent,
-            language: language
-        )
+        let meeting = transcript.meeting(from: url, language: language)
         meetingStore.add(meeting, in: folder)
         reveal(meeting.id)
     }
@@ -761,7 +755,7 @@ private enum PendingImport: Identifiable {
     case recording(URL, alreadyTranscribed: Meeting?, folder: MeetingFolder?, isCopy: Bool)
 
     /// A transcript, already decoded, and the folder it was dropped on.
-    case transcript(URL, KlangTranscript, folder: MeetingFolder?)
+    case transcript(URL, ImportedTranscript, folder: MeetingFolder?)
 
     var id: String {
         switch self {

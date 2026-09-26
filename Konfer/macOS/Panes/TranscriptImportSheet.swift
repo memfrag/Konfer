@@ -13,10 +13,14 @@ import SwiftUI
 /// else on that sheet — the speaker count, the model download — has nothing to
 /// answer to, and the summary below takes their place: what the file turned
 /// out to contain, before it becomes a meeting.
+///
+/// A Konfer export already says what language it is in, so for one of those
+/// the language is shown rather than asked: the only way to answer the
+/// question differently is to answer it wrongly.
 struct TranscriptImportSheet: View {
 
     let url: URL
-    let transcript: KlangTranscript
+    let transcript: ImportedTranscript
 
     /// The folder the file was dropped on, which wins over the usual one.
     var initialFolder: MeetingFolder?
@@ -45,18 +49,29 @@ struct TranscriptImportSheet: View {
             }
 
             Form {
-                LabeledContent("Speakers:", value: "\(transcript.speakerIDs.count)")
+                if case .konfer(let export) = transcript {
+                    LabeledContent("Title:", value: export.title)
+                }
+                LabeledContent("Speakers:", value: "\(transcript.speakerCount)")
                 LabeledContent("Length:", value: Timecode.short(transcript.duration))
 
-                Picker("Language:", selection: $language) {
-                    ForEach(MeetingLanguage.allCases, id: \.self) { language in
-                        Text(language.displayName).tag(language)
+                if let declared = transcript.declaredLanguage {
+                    LabeledContent("Language:", value: declared.displayName)
+                } else {
+                    Picker("Language:", selection: $language) {
+                        ForEach(MeetingLanguage.allCases, id: \.self) { language in
+                            Text(language.displayName).tag(language)
+                        }
                     }
+                    .help(
+                        "Nothing is transcribed on import — the language is only "
+                        + "recorded with the transcript."
+                    )
                 }
-                .help(
-                    "Nothing is transcribed on import — the language is only "
-                    + "recorded with the transcript."
-                )
+
+                if case .konfer(let export) = transcript, let target = export.translationTarget {
+                    LabeledContent("Translation:", value: target.displayName)
+                }
 
                 FolderPicker(folder: $folder)
             }
@@ -78,6 +93,7 @@ struct TranscriptImportSheet: View {
         .padding(20)
         .frame(width: 420)
         .onAppear {
+            language = transcript.declaredLanguage ?? language
             folder = initialFolder
                 ?? librarySelection.folderForNewMeeting(settings: appSettings, in: meetingStore)
         }
@@ -105,10 +121,10 @@ struct TranscriptImportSheet: View {
 #Preview {
     TranscriptImportSheet(
         url: URL(fileURLWithPath: "/tmp/klang-transcript.json"),
-        transcript: KlangTranscript(segments: [
+        transcript: .klang(KlangTranscript(segments: [
             .init(text: "Att vi, det är helt rätt.", start: 0.18, end: 3.18, speaker: "Talare 1"),
             .init(text: "Ja, precis.", start: 3.76, end: 5.2, speaker: "Talare 2")
-        ]),
+        ])),
         onImport: { _, _ in }
     )
     .previewEnvironment()

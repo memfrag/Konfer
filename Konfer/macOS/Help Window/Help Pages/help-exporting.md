@@ -23,3 +23,13 @@ Subtitles are cut where the words were spoken, at most two lines and six seconds
 When a meeting has a translation, the Export menu has a submenu named after its language, such as **Export in English**. It offers Markdown, both subtitle formats and the subtitled video in that language. JSON isn't in it, because the ordinary JSON export already carries both languages.
 
 Translated subtitles keep the original's timings. Each translated line is spread across the cues its original was cut into, so every start and end time comes from the recording.
+
+## Bringing a transcript back
+
+A JSON export can be imported again, on this Mac or another one. Drop it onto the window, or choose **Import Transcript…** from the **+** menu in the sidebar.
+
+The meeting comes back with its title, language, speakers and their names, word timings, hand edits, translation and trim. Three things don't come back:
+
+- **The recording**, which the file doesn't contain. The meeting can't play until you choose **Choose Recording…**.
+- **Voices.** The export leaves them out, so imported speakers aren't suggested in other meetings.
+- **Lines outside a trim.** The export holds only the part you kept.
