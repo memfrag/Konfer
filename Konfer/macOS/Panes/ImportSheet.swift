@@ -44,17 +44,27 @@ struct ImportSheet: View {
     /// Seeded on a re-run with what the first run was told.
     var initialSuppressBleed = false
 
-    let onTranscribe: (MeetingLanguage, Int?, KeptRange?, Bool) -> Void
+    /// Whether to ask where the meeting goes. Not on a re-run, which replaces
+    /// a meeting where it already is.
+    var choosesFolder = true
+
+    /// Language, expected speakers, trim, whether to silence the call on the
+    /// microphone, and the folder to file the meeting in.
+    let onTranscribe: (MeetingLanguage, Int?, KeptRange?, Bool, MeetingFolder) -> Void
     var onOpenExisting: ((Meeting) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
     @Environment(ModelDownloadQueue.self) private var downloads
+    @Environment(AppSettings.self) private var appSettings
+    @Environment(MeetingStore.self) private var meetingStore
+    @Environment(LibrarySelection.self) private var librarySelection
 
     @State private var language: MeetingLanguage
     @State private var knowsSpeakerCount = false
     @State private var speakerCount = 4
     @State private var suppressBleed: Bool
+    @State private var folder: MeetingFolder = .root
 
     @State private var player = PlayerController()
     @State private var waveform: Waveform?
@@ -71,7 +81,8 @@ struct ImportSheet: View {
         initialRange: KeptRange? = nil,
         separatesSources: Bool = false,
         initialSuppressBleed: Bool = false,
-        onTranscribe: @escaping (MeetingLanguage, Int?, KeptRange?, Bool) -> Void,
+        choosesFolder: Bool = true,
+        onTranscribe: @escaping (MeetingLanguage, Int?, KeptRange?, Bool, MeetingFolder) -> Void,
         onOpenExisting: ((Meeting) -> Void)? = nil
     ) {
         self.url = url
@@ -82,6 +93,7 @@ struct ImportSheet: View {
         self.initialRange = initialRange
         self.separatesSources = separatesSources
         self.initialSuppressBleed = initialSuppressBleed
+        self.choosesFolder = choosesFolder
         self.onTranscribe = onTranscribe
         self.onOpenExisting = onOpenExisting
         _language = State(initialValue: initialLanguage)
@@ -123,6 +135,10 @@ struct ImportSheet: View {
 
                 if let missing = missingModel {
                     modelNotice(missing)
+                }
+
+                if choosesFolder {
+                    FolderPicker(folder: $folder)
                 }
 
                 Toggle("I know how many people spoke", isOn: $knowsSpeakerCount)
@@ -169,7 +185,8 @@ struct ImportSheet: View {
                         language,
                         knowsSpeakerCount ? speakerCount : nil,
                         trim,
-                        separatesSources && suppressBleed
+                        separatesSources && suppressBleed,
+                        folder
                     )
                     dismiss()
                 }
@@ -180,6 +197,11 @@ struct ImportSheet: View {
         .padding(20)
         .frame(width: 560)
         .task { await load() }
+        // Read once, when the sheet opens: the sidebar may change behind it,
+        // and the picker shouldn't move while someone is looking at it.
+        .onAppear {
+            folder = librarySelection.folderForNewMeeting(settings: appSettings, in: meetingStore)
+        }
         .onDisappear { player.unload() }
         // Playback stops at the right-hand handle, so listening to the edge of
         // the selection tells you where it is rather than running past it.
@@ -359,7 +381,7 @@ struct ImportSheet: View {
     ImportSheet(
         url: URL(fileURLWithPath: "/tmp/Standup.m4a"),
         separatesSources: true,
-        onTranscribe: { _, _, _, _ in }
+        onTranscribe: { _, _, _, _, _ in }
     )
     .previewEnvironment()
 }

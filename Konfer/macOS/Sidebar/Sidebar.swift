@@ -11,6 +11,7 @@ struct Sidebar: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(MeetingStore.self) private var meetingStore
     @Environment(TranscriptionPipeline.self) private var pipeline
+    @Environment(LibrarySelection.self) private var librarySelection
 
     @State private var searchText: String = ""
     @State private var selection: SidebarSelection?
@@ -71,19 +72,20 @@ struct Sidebar: View {
             case .recording(let url, let alreadyTranscribed):
                 // An imported file has no known channel layout, so it is never
                 // two-sided and the speakers question does not apply.
-                ImportSheet(url: url, alreadyTranscribed: alreadyTranscribed) { language, speakers, trim, _ in
+                ImportSheet(url: url, alreadyTranscribed: alreadyTranscribed) { language, speakers, trim, _, folder in
                     pipeline.enqueue(
                         url,
                         language: language,
                         expectedSpeakers: speakers,
-                        trim: trim
+                        trim: trim,
+                        folder: folder
                     )
                 } onOpenExisting: { meeting in
                     selection = .meeting(meeting.id)
                 }
             case .transcript(let url, let transcript):
-                TranscriptImportSheet(url: url, transcript: transcript) { language in
-                    importTranscript(transcript, from: url, language: language)
+                TranscriptImportSheet(url: url, transcript: transcript) { language, folder in
+                    importTranscript(transcript, from: url, language: language, folder: folder)
                 }
             }
         }
@@ -119,6 +121,12 @@ struct Sidebar: View {
             expanded = Set(savedExpandedFolders.split(separator: "\n").map {
                 MeetingFolder($0.split(separator: "/").map(String.init))
             })
+        }
+        // What the Transcribe sheet's folder picker starts on, including the
+        // one the Recorder window opens. `selectedFolder` follows a folder
+        // through a rename, since the selection does.
+        .onChange(of: selection, initial: true) { _, _ in
+            librarySelection.folder = selectedFolder
         }
         .onChange(of: expanded) { _, expanded in
             savedExpandedFolders = expanded
@@ -281,6 +289,7 @@ struct Sidebar: View {
                 Button("Rename") { beginRename(meeting) }
 
                 moveMenu(for: .meeting(meeting.id), from: meetingStore.folder(of: meeting.id) ?? .root)
+                Button("New Folder with Meeting") { newFolder(containing: meeting.id) }
 
                 Button("Reveal Audio in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
@@ -384,6 +393,20 @@ struct Sidebar: View {
         guard let folder = meetingStore.createFolder(in: parent) else { return }
         setExpanded(parent, true)
         selection = .folder(folder)
+        beginRename(folder)
+    }
+
+    /// Finder's New Folder with Selection: a folder beside the meeting, with
+    /// the meeting in it, named straight away.
+    ///
+    /// The meeting stays selected, so the transcript you were reading stays
+    /// on screen while you name where it now lives.
+    private func newFolder(containing id: UUID) {
+        let parent = meetingStore.folder(of: id) ?? .root
+        guard let folder = meetingStore.createFolder(in: parent) else { return }
+        meetingStore.move(id, to: folder)
+        setExpanded(parent, true)
+        setExpanded(folder, true)
         beginRename(folder)
     }
 
@@ -574,14 +597,15 @@ struct Sidebar: View {
     private func importTranscript(
         _ transcript: KlangTranscript,
         from url: URL,
-        language: MeetingLanguage
+        language: MeetingLanguage,
+        folder: MeetingFolder
     ) {
         let meeting = transcript.meeting(
             title: url.deletingPathExtension().lastPathComponent,
             language: language
         )
-        meetingStore.add(meeting)
-        selection = .meeting(meeting.id)
+        meetingStore.add(meeting, in: folder)
+        reveal(meeting.id)
     }
 }
 

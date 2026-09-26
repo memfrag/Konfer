@@ -50,14 +50,15 @@ struct RecorderView: View {
                 // Nothing else can tell the pipeline that — and it is also what
                 // makes the speakers question worth asking.
                 separatesSources: true
-            ) { language, speakers, trim, suppressBleed in
+            ) { language, speakers, trim, suppressBleed, folder in
                 pipeline.enqueue(
                     finished.url,
                     language: language,
                     expectedSpeakers: speakers,
                     trim: trim,
                     separatesSources: true,
-                    suppressesBleed: suppressBleed
+                    suppressesBleed: suppressBleed,
+                    folder: folder
                 )
             }
         }

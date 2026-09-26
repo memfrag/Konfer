@@ -142,8 +142,10 @@ struct MeetingPane: View {
                     // What the first run knew about the file, rather than what
                     // a second look at it would guess.
                     separatesSources: meeting.hasSeparateSources ?? false,
-                    initialSuppressBleed: meeting.suppressedBleed ?? false
-                ) { language, speakers, trim, suppressBleed in
+                    initialSuppressBleed: meeting.suppressedBleed ?? false,
+                    // It replaces this meeting, where it is filed.
+                    choosesFolder: false
+                ) { language, speakers, trim, suppressBleed, _ in
                     pipeline.enqueue(
                         meeting.audioURL,
                         language: language,

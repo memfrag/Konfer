@@ -47,6 +47,23 @@ struct TranscriptionSettingsTab: View {
             }
 
             Section {
+                Picker("File new meetings in:", selection: $appSettings.newMeetingFolder) {
+                    Text("The folder selected in the sidebar").tag(NewMeetingFolder.selectedFolder)
+                    Text("The top level").tag(NewMeetingFolder.topLevel)
+                }
+            } header: {
+                Text("Folders")
+            } footer: {
+                Text(
+                    "Where the folder picker starts when you transcribe, record "
+                    + "or import a transcript. You can choose another folder "
+                    + "each time."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle("Faster, less complete", isOn: $appSettings.fastTranscription)
                     .onChange(of: appSettings.fastTranscription) { _, value in
                         pipeline.fastTranscription = value

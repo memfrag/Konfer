@@ -50,6 +50,10 @@ final class TranscriptionPipeline {
         /// narrower range, and it should land back on the same row in the
         /// sidebar rather than beside it.
         let replacing: UUID?
+
+        /// Where a new meeting is filed. Unused by a re-run, which replaces a
+        /// meeting where it already is.
+        let folder: MeetingFolder
     }
 
     enum Stage: Equatable {
@@ -138,7 +142,8 @@ final class TranscriptionPipeline {
         replacing: UUID? = nil,
         title: String? = nil,
         separatesSources: Bool = false,
-        suppressesBleed: Bool = false
+        suppressesBleed: Bool = false,
+        folder: MeetingFolder = .root
     ) {
         let job = Job(
             sourceURL: url,
@@ -150,7 +155,8 @@ final class TranscriptionPipeline {
             trim: trim,
             separatesSources: separatesSources,
             suppressesBleed: suppressesBleed,
-            replacing: replacing
+            replacing: replacing,
+            folder: folder
         )
         queue.append(job)
         startNextIfIdle()
@@ -363,7 +369,9 @@ final class TranscriptionPipeline {
                     hasSeparateSources: job.separatesSources ? true : nil,
                     suppressedBleed: job.suppressesBleed ? true : nil
                 )
-                meetingStore.add(meeting)
+                // Into the top level if the folder went while this ran; see
+                // `MeetingStore.add(_:in:)`.
+                meetingStore.add(meeting, in: job.folder)
                 lastFinishedMeetingID = meeting.id
             }
 

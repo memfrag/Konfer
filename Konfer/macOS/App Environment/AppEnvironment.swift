@@ -50,6 +50,10 @@ public final class AppEnvironment {
     /// minutes of work has to outlive the pane that asked for it.
     internal let translations: TranslationQueue
 
+    /// The folder the sidebar is in. Shared, because the Recorder files its
+    /// recordings there and is a window of its own.
+    internal let librarySelection: LibrarySelection
+
     // MARK: - Init
 
     /// Creates an environment with the provided dependencies.
@@ -64,7 +68,8 @@ public final class AppEnvironment {
         pipeline: TranscriptionPipeline,
         downloads: ModelDownloadQueue,
         videoExports: VideoExportQueue,
-        translations: TranslationQueue
+        translations: TranslationQueue,
+        librarySelection: LibrarySelection = LibrarySelection()
     ) {
         self.appSettings = appSettings
         self.engineeringMode = engineeringMode
@@ -74,5 +79,6 @@ public final class AppEnvironment {
         self.downloads = downloads
         self.videoExports = videoExports
         self.translations = translations
+        self.librarySelection = librarySelection
     }
 }

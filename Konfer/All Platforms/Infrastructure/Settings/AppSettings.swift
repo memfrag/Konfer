@@ -31,6 +31,9 @@ import KeyValueStore
 
         /// Whether the first-run screen has been shown.
         case hasCompletedOnboarding
+
+        /// Which folder a new meeting is filed in unless told otherwise.
+        case newMeetingFolder
     }
 
     // MARK: Properties
@@ -71,6 +74,15 @@ import KeyValueStore
         }
     }
 
+    /// Where the folder picker in the Transcribe sheet starts: the folder
+    /// selected in the sidebar, or the top level. The picker can still send
+    /// any one meeting somewhere else.
+    public var newMeetingFolder: NewMeetingFolder {
+        didSet {
+            store.save(newMeetingFolder, for: .newMeetingFolder)
+        }
+    }
+
     // MARK: Setup
 
     /// The key–value store that backs this settings container.
@@ -89,5 +101,17 @@ import KeyValueStore
         fastTranscription = self.store.load(.fastTranscription, default: false)
         recordingFolder = self.store.load(.recordingFolder, default: "")
         hasCompletedOnboarding = self.store.load(.hasCompletedOnboarding, default: false)
+        newMeetingFolder = self.store.load(.newMeetingFolder, default: .selectedFolder)
     }
+}
+
+/// Which folder a new meeting is filed in unless told otherwise.
+public enum NewMeetingFolder: String, CaseIterable, Sendable {
+
+    /// The folder selected in the sidebar, or the folder of the selected
+    /// meeting — where the user is working.
+    case selectedFolder
+
+    /// The top of the library, whatever is selected.
+    case topLevel
 }

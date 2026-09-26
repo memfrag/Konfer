@@ -18,11 +18,15 @@ struct TranscriptImportSheet: View {
     let url: URL
     let transcript: KlangTranscript
 
-    let onImport: (MeetingLanguage) -> Void
+    let onImport: (MeetingLanguage, MeetingFolder) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppSettings.self) private var appSettings
+    @Environment(MeetingStore.self) private var meetingStore
+    @Environment(LibrarySelection.self) private var librarySelection
 
     @State private var language: MeetingLanguage = .english
+    @State private var folder: MeetingFolder = .root
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -50,6 +54,8 @@ struct TranscriptImportSheet: View {
                     "Nothing is transcribed on import — the language is only "
                     + "recorded with the transcript."
                 )
+
+                FolderPicker(folder: $folder)
             }
             .formStyle(.grouped)
 
@@ -60,7 +66,7 @@ struct TranscriptImportSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button("Import") {
-                    onImport(language)
+                    onImport(language, folder)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -68,6 +74,9 @@ struct TranscriptImportSheet: View {
         }
         .padding(20)
         .frame(width: 420)
+        .onAppear {
+            folder = librarySelection.folderForNewMeeting(settings: appSettings, in: meetingStore)
+        }
     }
 
     /// Said here rather than discovered later, because the missing player is
@@ -96,7 +105,7 @@ struct TranscriptImportSheet: View {
             .init(text: "Att vi, det är helt rätt.", start: 0.18, end: 3.18, speaker: "Talare 1"),
             .init(text: "Ja, precis.", start: 3.76, end: 5.2, speaker: "Talare 2")
         ]),
-        onImport: { _ in }
+        onImport: { _, _ in }
     )
     .previewEnvironment()
 }
