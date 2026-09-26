@@ -11,46 +11,70 @@ struct ExportCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .importExport) {
-            Section {
-                ForEach(TranscriptExporter.Format.allCases) { format in
-                    Button("Export as \(format.displayName)…") {
-                        meeting?.export(format, .original)
-                    }
-                    .disabled(meeting == nil)
+            ExportMenuItems(meeting: meeting, namesTheAction: true)
+        }
+    }
+}
+
+// MARK: - Menu items
+
+/// Every way to export a meeting, for File ▸ Export and the toolbar's Export
+/// button alike — written once, so the two can't come to offer different
+/// things.
+struct ExportMenuItems: View {
+
+    let meeting: ExportableMeeting?
+
+    /// "Export as Markdown…" in File ▸ Export, where the item has to say what
+    /// it does; "Markdown…" under a button already called Export.
+    var namesTheAction = false
+
+    var body: some View {
+        Section {
+            ForEach(TranscriptExporter.Format.allCases) { format in
+                Button(namesTheAction ? "Export as \(format.displayName)…" : "\(format.displayName)…") {
+                    meeting?.export(format, .original)
                 }
+                .disabled(meeting == nil)
             }
-            // Not one of the formats above: those render a transcript to data
-            // in memory, and this copies a recording. Sidecar subtitles are for
-            // players that read them; this is for QuickTime, which doesn't.
-            Section {
-                Button("Export Video with Subtitles…") {
-                    meeting?.exportVideo(.original)
+        }
+        // Not one of the formats above: those render a transcript to data
+        // in memory, and this copies a recording. Sidecar subtitles are for
+        // players that read them; this is for QuickTime, which doesn't.
+        Section {
+            Button(namesTheAction ? "Export Video with Subtitles…" : "Video with Subtitles…") {
+                meeting?.exportVideo(.original)
+            }
+            .disabled(meeting?.canExportVideo != true)
+        }
+        // One submenu rather than a second flat list of five: the same
+        // formats twice over would double the length of the menu for every
+        // meeting, translated or not. Named after the language, so the menu
+        // says which one without being opened. JSON is absent because it
+        // already carries both texts — a second file would be the same bytes
+        // under a longer name.
+        Section {
+            Menu(translationTitle) {
+                ForEach(TranscriptExporter.Format.allCases.filter(\.hasTranslatedVariant)) { format in
+                    Button("\(format.displayName)…") {
+                        meeting?.export(format, .translated)
+                    }
+                }
+                Divider()
+                Button("Video with Subtitles…") {
+                    meeting?.exportVideo(.translated)
                 }
                 .disabled(meeting?.canExportVideo != true)
             }
-            // One submenu rather than a second flat list of five: the same
-            // formats twice over would double the length of File ▸ Export for
-            // every meeting, translated or not. Named after the language, so
-            // the menu says which one without being opened. JSON is absent
-            // because it already carries both texts — a second file would be
-            // the same bytes under a longer name.
-            Section {
-                Menu(meeting?.translationTarget.map { "Export in \($0.displayName)" }
-                     ?? "Export Translation") {
-                    ForEach(TranscriptExporter.Format.allCases.filter(\.hasTranslatedVariant)) { format in
-                        Button("\(format.displayName)…") {
-                            meeting?.export(format, .translated)
-                        }
-                    }
-                    Divider()
-                    Button("Video with Subtitles…") {
-                        meeting?.exportVideo(.translated)
-                    }
-                    .disabled(meeting?.canExportVideo != true)
-                }
-                .disabled(meeting?.translationTarget == nil)
-            }
+            .disabled(meeting?.translationTarget == nil)
         }
+    }
+
+    private var translationTitle: String {
+        guard let target = meeting?.translationTarget else {
+            return namesTheAction ? "Export Translation" : "Translation"
+        }
+        return namesTheAction ? "Export in \(target.displayName)" : "In \(target.displayName)"
     }
 }
 

@@ -84,6 +84,20 @@ struct MeetingPane: View {
         .task(id: meetingID) { await loadWaveform() }
         .onDisappear { player.unload() }
         .focusedSceneValue(\.exportableMeeting, exportable)
+        // Everything File ▸ Export offers, from the same items, for the
+        // transcript on screen. Read from this pane rather than from the
+        // focused value, so it answers for this meeting wherever focus is.
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    ExportMenuItems(meeting: exportable)
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
+                .help("Export this transcript")
+                .disabled(exportable == nil)
+            }
+        }
         // Lets Edit ▸ Find drive this transcript's find bar.
         .focusedSceneValue(\.transcriptFind, find)
         // `initial` matters: without it the controller holds no transcript
