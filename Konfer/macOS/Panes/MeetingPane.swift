@@ -162,17 +162,20 @@ struct MeetingPane: View {
                     separatesSources: meeting.hasSeparateSources ?? false,
                     initialSuppressBleed: meeting.suppressedBleed ?? false,
                     // It replaces this meeting, where it is filed.
-                    choosesFolder: false
-                ) { language, speakers, trim, suppressBleed, _ in
+                    choosesFolder: false,
+                    // The model that made it, so trying the other is a choice.
+                    initialModel: meeting.model
+                ) { choices in
                     pipeline.enqueue(
                         meeting.audioURL,
-                        language: language,
-                        expectedSpeakers: speakers,
-                        trim: trim,
+                        language: choices.language,
+                        expectedSpeakers: choices.expectedSpeakers,
+                        trim: choices.trim,
                         replacing: meeting.id,
                         title: meeting.title,
                         separatesSources: meeting.hasSeparateSources ?? false,
-                        suppressesBleed: suppressBleed
+                        suppressesBleed: choices.suppressesBleed,
+                        model: choices.model
                     )
                 }
             }

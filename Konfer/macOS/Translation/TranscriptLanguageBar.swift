@@ -34,7 +34,7 @@ struct TranscriptLanguageBar: View {
                 .labelsHidden()
                 .fixedSize()
             } else {
-                Text(meeting.language.displayName)
+                Text(languageCaption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -73,6 +73,17 @@ struct TranscriptLanguageBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
+    }
+
+    /// The language, and the model too where the language offers more than
+    /// one — "Danish · Røst v3" — since which one made a transcript is then
+    /// worth knowing, and the whole point of offering both.
+    private var languageCaption: String {
+        guard ASRBackendKind.choices(for: meeting.language).count > 1 else {
+            return meeting.language.displayName
+        }
+        let model = ManagedModel(for: meeting.model)?.displayName ?? meeting.model.displayName
+        return "\(meeting.language.displayName) · \(model)"
     }
 
     private var isTranslatingThis: Bool {

@@ -52,9 +52,11 @@ struct ImportSheet: View {
     /// starting folder — dropping it there was the choice.
     var initialFolder: MeetingFolder?
 
-    /// Language, expected speakers, trim, whether to silence the call on the
-    /// microphone, and the folder to file the meeting in.
-    let onTranscribe: (MeetingLanguage, Int?, KeptRange?, Bool, MeetingFolder) -> Void
+    /// Seeded on a re-run with the model the meeting was made with, so
+    /// transcribing it again with the other one is a deliberate switch.
+    var initialModel: ASRBackendKind?
+
+    let onTranscribe: (TranscribeChoices) -> Void
     var onOpenExisting: ((Meeting) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -69,6 +71,11 @@ struct ImportSheet: View {
     @State private var speakerCount = 4
     @State private var suppressBleed: Bool
     @State private var folder: MeetingFolder = .root
+    @State private var model: ASRBackendKind
+
+    /// The model last used for each language with a choice — see
+    /// ``RememberedModels``.
+    @AppStorage("rememberedTranscriptionModels") private var rememberedModels = ""
 
     @State private var player = PlayerController()
     @State private var waveform: Waveform?
@@ -87,7 +94,8 @@ struct ImportSheet: View {
         initialSuppressBleed: Bool = false,
         choosesFolder: Bool = true,
         initialFolder: MeetingFolder? = nil,
-        onTranscribe: @escaping (MeetingLanguage, Int?, KeptRange?, Bool, MeetingFolder) -> Void,
+        initialModel: ASRBackendKind? = nil,
+        onTranscribe: @escaping (TranscribeChoices) -> Void,
         onOpenExisting: ((Meeting) -> Void)? = nil
     ) {
         self.url = url
@@ -100,11 +108,17 @@ struct ImportSheet: View {
         self.initialSuppressBleed = initialSuppressBleed
         self.choosesFolder = choosesFolder
         self.initialFolder = initialFolder
+        self.initialModel = initialModel
         self.onTranscribe = onTranscribe
         self.onOpenExisting = onOpenExisting
         _language = State(initialValue: initialLanguage)
         _range = State(initialValue: initialRange)
         _suppressBleed = State(initialValue: initialSuppressBleed)
+        // Replaced on appear by the remembered model when there's no initial
+        // one: `@AppStorage` can't be read before the view exists.
+        _model = State(initialValue: initialModel.flatMap {
+            ASRBackendKind.choices(for: initialLanguage).contains($0) ? $0 : nil
+        } ?? ASRBackendKind(transcribing: initialLanguage))
     }
 
     var body: some View {
@@ -138,6 +152,21 @@ struct ImportSheet: View {
                     + "KB-Whisper for Swedish, and OpenAI's Whisper for Danish, "
                     + "Dutch and Polish."
                 )
+
+                // Only where there is something to choose — today, Danish.
+                // Everywhere else the language has settled it.
+                if modelChoices.count > 1 {
+                    Picker("Model:", selection: $model) {
+                        ForEach(modelChoices, id: \.self) { choice in
+                            Text(ManagedModel(for: choice)?.displayName ?? choice.displayName)
+                                .tag(choice)
+                        }
+                    }
+                    Text(modelCaption)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 if let missing = missingModel {
                     modelNotice(missing)
@@ -187,13 +216,17 @@ struct ImportSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(confirmTitle) {
-                    onTranscribe(
-                        language,
-                        knowsSpeakerCount ? speakerCount : nil,
-                        trim,
-                        separatesSources && suppressBleed,
-                        folder
-                    )
+                    var memory = RememberedModels(rememberedModels)
+                    memory.remember(model, for: language)
+                    rememberedModels = memory.stored
+                    onTranscribe(TranscribeChoices(
+                        language: language,
+                        expectedSpeakers: knowsSpeakerCount ? speakerCount : nil,
+                        trim: trim,
+                        suppressesBleed: separatesSources && suppressBleed,
+                        folder: folder,
+                        model: model
+                    ))
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -205,7 +238,15 @@ struct ImportSheet: View {
         .task { await load() }
         // Read once, when the sheet opens: the sidebar may change behind it,
         // and the picker shouldn't move while someone is looking at it.
+        // A different language offers different models; start each on the one
+        // last used for it.
+        .onChange(of: language) { _, language in
+            model = RememberedModels(rememberedModels).model(for: language)
+        }
         .onAppear {
+            if initialModel == nil {
+                model = RememberedModels(rememberedModels).model(for: language)
+            }
             folder = initialFolder
                 ?? librarySelection.folderForNewMeeting(settings: appSettings, in: meetingStore)
         }
@@ -337,8 +378,28 @@ struct ImportSheet: View {
     /// Nil for the languages Apple covers, whatever is on disk: macOS installs
     /// those itself on first use, so there is nothing to wait for.
     private var missingModel: ManagedModel? {
-        guard let model = ManagedModel(transcribing: language) else { return nil }
-        return downloads.state(of: model) == .installed ? nil : model
+        guard let required = ManagedModel(for: model) else { return nil }
+        return downloads.state(of: required) == .installed ? nil : required
+    }
+
+    private var modelChoices: [ASRBackendKind] {
+        ASRBackendKind.choices(for: language)
+    }
+
+    /// Why one might pick either, in a line — the numbers are the model
+    /// authors', and say so.
+    private var modelCaption: String {
+        switch model {
+        case .roestWhisper:
+            // A non-breaking hyphen, so "large-v3" isn't split across lines.
+            "Fine-tuned for Danish by the CoRal project, which measures it at "
+            + "less than half Whisper large\u{2011}v3's errors on conversational Danish."
+        case .whisperLargeV3:
+            "OpenAI's multilingual Whisper, which transcribed Danish before Røst. "
+            + "Worth trying on the same recording to compare."
+        default:
+            model.summary
+        }
     }
 
     /// Says which model is missing and how big it is, rather than letting the
@@ -383,12 +444,27 @@ struct ImportSheet: View {
     }
 }
 
+// MARK: - Choices
+
+/// What the Transcribe sheet was told, handed to whoever starts the run.
+///
+/// One value rather than a closure of six arguments, three of them `Bool`s and
+/// optionals, that every caller had to pass in the right order.
+struct TranscribeChoices {
+    let language: MeetingLanguage
+    let expectedSpeakers: Int?
+    let trim: KeptRange?
+    let suppressesBleed: Bool
+    let folder: MeetingFolder
+    let model: ASRBackendKind
+}
+
 #if DEBUG
 #Preview {
     ImportSheet(
         url: URL(fileURLWithPath: "/tmp/Standup.m4a"),
         separatesSources: true,
-        onTranscribe: { _, _, _, _, _ in }
+        onTranscribe: { _ in }
     )
     .previewEnvironment()
 }

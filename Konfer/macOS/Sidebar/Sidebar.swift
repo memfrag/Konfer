@@ -76,17 +76,18 @@ struct Sidebar: View {
                     url: url,
                     alreadyTranscribed: alreadyTranscribed,
                     initialFolder: droppedOn
-                ) { language, speakers, trim, _, folder in
+                ) { choices in
                     // A copy is kept only once it is actually transcribed;
                     // abandoned with the sheet, it stays in the staging folder
                     // for the system to clear.
                     let url = isCopy ? keep(url) : url
                     pipeline.enqueue(
                         url,
-                        language: language,
-                        expectedSpeakers: speakers,
-                        trim: trim,
-                        folder: folder
+                        language: choices.language,
+                        expectedSpeakers: choices.expectedSpeakers,
+                        trim: choices.trim,
+                        folder: choices.folder,
+                        model: choices.model
                     )
                 } onOpenExisting: { meeting in
                     selection = .meeting(meeting.id)
