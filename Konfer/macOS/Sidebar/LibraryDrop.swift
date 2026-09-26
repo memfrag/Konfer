@@ -13,14 +13,20 @@ import UniformTypeIdentifiers
 /// take all three: a meeting or folder being refiled, a recording from
 /// Finder, and a recording from an app that only hands over copies.
 ///
-/// The order of the representations is the point. A file on disk is matched
-/// as a URL before anything else looks at it, so a recording dragged from
-/// Finder is transcribed where it is — Konfer never copies audio it can
-/// point at. Only what arrives without a URL falls through to the file
-/// representation, and that is Voice Memos: a Mac Catalyst app, whose drags
-/// are file promises — the file is written only when the receiver asks, to
-/// a folder the receiver picks — so there is nothing to point at, and the
-/// memo itself sits in Voice Memos' own protected storage.
+/// Konfer never copies audio it can point at, so a recording dragged from
+/// Finder has to be transcribed where it is. The order of the
+/// representations was once trusted to see to that — a file on disk matched
+/// as a URL before anything else looked at it — and in tests it did. A real
+/// drag from Finder does not: it falls through to the file representation,
+/// and every recording dropped from Finder was being copied into the
+/// Recorder's folder, whole and numbered beside the original.
+///
+/// So the file representation asks to open in place, and copies only when
+/// the system says it could not hand over the original. That is Voice Memos:
+/// a Mac Catalyst app, whose drags are file promises — the file is written
+/// only when the receiver asks, to a folder the receiver picks — so there is
+/// nothing to point at, and the memo itself sits in Voice Memos' own
+/// protected storage.
 nonisolated enum LibraryDrop: Transferable {
 
     /// A meeting or folder being moved within the sidebar.
@@ -38,8 +44,18 @@ nonisolated enum LibraryDrop: Transferable {
     static var transferRepresentation: some TransferRepresentation {
         ProxyRepresentation(importing: { (item: SidebarItem) in LibraryDrop.item(item) })
         ProxyRepresentation(importing: { (url: URL) in LibraryDrop.file(url) })
-        FileRepresentation(importedContentType: .audiovisualContent) { received in
-            .copy(try stage(received.file))
+        FileRepresentation(
+            importedContentType: .audiovisualContent,
+            shouldAttemptToOpenInPlace: true
+        ) { received in
+            // Notice rather than info, which the system keeps: when a drag
+            // from another app misbehaves, this is the line that says how
+            // far it got.
+            if received.isOriginalFile {
+                logger.notice("Received \(received.file.lastPathComponent, privacy: .public) in place")
+                return .file(received.file)
+            }
+            return .copy(try stage(received.file))
         }
     }
 
@@ -53,8 +69,6 @@ nonisolated enum LibraryDrop: Transferable {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let staged = folder.appendingPathComponent(file.lastPathComponent)
         try FileManager.default.copyItem(at: file, to: staged)
-        // Notice rather than info, which the system keeps: when a drag from
-        // another app misbehaves, this is the line that says how far it got.
         logger.notice("Received a copy of \(file.lastPathComponent, privacy: .public)")
         return staged
     }

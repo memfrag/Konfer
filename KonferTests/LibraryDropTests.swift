@@ -44,6 +44,31 @@ struct LibraryDropTests {
         #expect(url.standardizedFileURL == recording.standardizedFileURL)
     }
 
+    @Test("A file offered in place rather than as a URL — a real Finder drag — is still not copied")
+    func inPlaceFilesAreNotCopied() async throws {
+        // What a drag from Finder turns out to be once it reaches the app, as
+        // opposed to `NSItemProvider(contentsOf:)`, which offers a URL first
+        // and made the order of representations look sufficient.
+        let recording = try audioFile(named: "Standup.wav")
+        let provider = NSItemProvider()
+        provider.registerFileRepresentation(
+            forTypeIdentifier: UTType.wav.identifier,
+            fileOptions: .openInPlace,
+            visibility: .all
+        ) { completion in
+            completion(recording, true, nil)
+            return nil
+        }
+
+        let drop = try await load(provider)
+
+        guard case .file(let url) = drop else {
+            Issue.record("Expected the file itself, got \(drop)")
+            return
+        }
+        #expect(url.standardizedFileURL == recording.standardizedFileURL)
+    }
+
     @Test("Audio offered only as a file to copy — a Voice Memo — is copied, named after the memo")
     func promisedAudioIsCopied() async throws {
         let memo = try audioFile(named: "Kickoff with Anna.m4a")
@@ -64,6 +89,9 @@ struct LibraryDropTests {
             Issue.record("Expected a copy, got \(drop)")
             return
         }
+        // The staging folder is the app's real one, and a copy left there by
+        // every test run piles up.
+        defer { try? FileManager.default.removeItem(at: staged.deletingLastPathComponent()) }
         #expect(staged.standardizedFileURL != memo.standardizedFileURL)
         #expect(try Data(contentsOf: staged) == Data(contentsOf: memo))
         // Named after the memo. The extension is the system's, taken from the
