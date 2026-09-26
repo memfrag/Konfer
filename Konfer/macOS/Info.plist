@@ -20,6 +20,22 @@
     <string>https://raw.githubusercontent.com/memfrag/Konfer/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>AvJMcXvL9lwbU8D00Z9uECjR9zdeOlcsl7Rktg/hQVE=</string>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <!-- A meeting or folder dragged within the sidebar. Konfer's own
+                 type, so a drag between folders can never be mistaken for a
+                 file dropped on the window to transcribe. See SidebarItem. -->
+            <key>UTTypeIdentifier</key>
+            <string>pizza.martin.Konfer.library-item</string>
+            <key>UTTypeDescription</key>
+            <string>Konfer Library Item</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+        </dict>
+    </array>
     <key>UTImportedTypeDeclarations</key>
     <array>
         <dict>

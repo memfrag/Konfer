@@ -34,6 +34,13 @@ final class MeetingStore {
     /// Where each meeting's file is.
     private var locations: [UUID: Location] = [:]
 
+    /// What each file held when it was last read or written, and when it
+    /// was modified then — so reading the library again decodes only what
+    /// changed. The app reads it again every time it comes to the front, and
+    /// an hour's transcript is over a megabyte of JSON.
+    @ObservationIgnored
+    private var lastSeen: [Location: (meeting: Meeting, modified: Date)] = [:]
+
     @ObservationIgnored
     private let directory: URL
 
@@ -69,6 +76,21 @@ final class MeetingStore {
     /// Where a folder is on disk.
     func url(of folder: MeetingFolder) -> URL {
         folder.url(in: directory)
+    }
+
+    /// The meetings filed directly in a folder, newest first.
+    func meetings(in folder: MeetingFolder) -> [Meeting] {
+        meetings.filter { locations[$0.id]?.folder == folder }
+    }
+
+    /// The folders directly inside a folder, in Finder's order.
+    func subfolders(of folder: MeetingFolder) -> [MeetingFolder] {
+        folders.filter { $0.parent == folder }
+    }
+
+    /// How many meetings are in a folder, counting every folder inside it.
+    func meetingCount(in folder: MeetingFolder) -> Int {
+        locations.values.count { folder.contains($0.folder) }
     }
 
     // MARK: - Mutation
@@ -268,34 +290,47 @@ final class MeetingStore {
                     scan(child)
                     continue
                 }
-                guard item.pathExtension == "json",
-                      let data = try? Data(contentsOf: item),
-                      let meeting = try? decoder.decode(Meeting.self, from: data),
-                      // Written by a newer version of the app: skip rather
-                      // than crash or silently mangle.
-                      meeting.schemaVersion <= Meeting.currentSchemaVersion
-                else { continue }
+                guard item.pathExtension == "json" else { continue }
+                let location = Location(folder: folder, filename: item.lastPathComponent)
+                let modified = values?.contentModificationDate ?? .distantPast
+
+                let meeting: Meeting
+                if let seen = lastSeen[location], seen.modified == modified {
+                    meeting = seen.meeting
+                } else {
+                    guard let data = try? Data(contentsOf: item),
+                          let decoded = try? decoder.decode(Meeting.self, from: data),
+                          // Written by a newer version of the app: skip rather
+                          // than crash or silently mangle.
+                          decoded.schemaVersion <= Meeting.currentSchemaVersion
+                    else { continue }
+                    meeting = decoded
+                }
 
                 // Two files for one meeting: an edit made in an older Konfer,
                 // which still writes by id. The newer copy is the one that was
                 // edited last; the other stays on disk, untouched.
-                let modified = values?.contentModificationDate ?? .distantPast
                 if let existing = found[meeting.id], existing.modified >= modified {
                     Self.logger.notice("Two files for one meeting; reading the newer.")
                     continue
                 }
-                found[meeting.id] = (
-                    meeting,
-                    Location(folder: folder, filename: item.lastPathComponent),
-                    modified
-                )
+                found[meeting.id] = (meeting, location, modified)
             }
         }
         scan(.root)
 
-        meetings = found.values.map(\.meeting).sorted { $0.importedAt > $1.importedAt }
-        locations = found.mapValues(\.location)
-        folders = foundFolders.sorted()
+        // Assigned only when different, so a rescan that finds nothing new
+        // doesn't redraw every view that reads the library.
+        let loaded = found.values.map(\.meeting).sorted { $0.importedAt > $1.importedAt }
+        if loaded != meetings { meetings = loaded }
+        let loadedLocations = found.mapValues(\.location)
+        if loadedLocations != locations { locations = loadedLocations }
+        let loadedFolders = foundFolders.sorted()
+        if loadedFolders != folders { folders = loadedFolders }
+        lastSeen = Dictionary(
+            found.values.map { ($0.location, (meeting: $0.meeting, modified: $0.modified)) },
+            uniquingKeysWith: { first, _ in first }
+        )
 
         for meeting in meetings {
             renameIfNamedByID(meeting)
@@ -365,7 +400,12 @@ final class MeetingStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(meeting) else { return }
-        try? data.write(to: url(of: location), options: .atomic)
+        let file = url(of: location)
+        guard (try? data.write(to: file, options: .atomic)) != nil else { return }
+        // Remembered, so the next rescan knows this file is already read.
+        if let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
+            lastSeen[location] = (meeting, modified)
+        }
     }
 
     // MARK: - Folders, internally

@@ -325,6 +325,48 @@ struct MeetingStoreTests {
         #expect(reread.folder(of: nested.id) == MeetingFolder(["Acme"]))
     }
 
+    // MARK: - Reading again
+
+    @Test("Reading the library again finds a meeting filed in Finder meanwhile")
+    func reloadFollowsFinder() throws {
+        let store = MeetingStore(directory: directory)
+        let kickoff = meeting("Kickoff")
+        store.add(kickoff)
+        let archive = directory.appendingPathComponent("Archive", isDirectory: true)
+        try FileManager.default.createDirectory(at: archive, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(
+            at: directory.appendingPathComponent("Kickoff.json"),
+            to: archive.appendingPathComponent("Kickoff.json")
+        )
+
+        store.reload()
+
+        #expect(store.folders == [MeetingFolder(["Archive"])])
+        #expect(store.folder(of: kickoff.id) == MeetingFolder(["Archive"]))
+    }
+
+    @Test("Reading the library again picks up a transcript changed outside Konfer")
+    func reloadRereadsChangedFiles() throws {
+        let store = MeetingStore(directory: directory)
+        let kickoff = meeting("Kickoff")
+        store.add(kickoff)
+
+        var edited = kickoff
+        edited.title = "Kickoff, edited elsewhere"
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let file = directory.appendingPathComponent("Kickoff.json")
+        try encoder.encode(edited).write(to: file)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: 60)],
+            ofItemAtPath: file.path
+        )
+
+        store.reload()
+
+        #expect(store.meeting(kickoff.id)?.title == "Kickoff, edited elsewhere")
+    }
+
     @Test("Deleting a meeting removes its file wherever it is filed")
     func deletingAFiledMeeting() throws {
         let store = MeetingStore(directory: directory)

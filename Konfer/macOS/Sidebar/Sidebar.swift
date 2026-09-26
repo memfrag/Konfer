@@ -24,11 +24,23 @@ struct Sidebar: View {
     /// A transcript file that turned out not to be one.
     @State private var importError: TranscriptImportError?
 
-    /// The meeting whose row is currently a text field, and what has been
-    /// typed into it.
-    @State private var renaming: UUID?
+    /// The meeting or folder whose row is currently a text field, and what
+    /// has been typed into it.
+    @State private var renaming: SidebarSelection?
     @State private var renameDraft = ""
     @FocusState private var isRenameFieldFocused: Bool
+
+    /// Which folders are open.
+    ///
+    /// Held here and only copied to scene storage, to survive a relaunch:
+    /// outside a scene — a preview, a test — scene storage ignores writes,
+    /// and a folder that won't open is a much worse failure than one that
+    /// forgets it was open.
+    @State private var expanded: Set<MeetingFolder> = []
+
+    /// ``expanded`` as saved: one path per line, its folders joined by
+    /// slashes — the one character no folder name on disk can contain.
+    @SceneStorage("expandedFolders") private var savedExpandedFolders = ""
 
     var body: some View {
         NavigationSplitView {
@@ -37,7 +49,8 @@ struct Sidebar: View {
             detail
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first else { return false }
+            // Files only: a dragged link is not a recording.
+            guard let url = urls.first, url.isFileURL else { return false }
             offerImport(of: url)
             return true
         }
@@ -94,7 +107,24 @@ struct Sidebar: View {
             )
         }
         .onChange(of: pipeline.lastFinishedMeetingID) { _, id in
-            if let id { selection = .meeting(id) }
+            if let id { reveal(id) }
+        }
+        // Someone may have filed meetings in Finder while Konfer was in the
+        // background. Only changed files are read again, so this is cheap.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            meetingStore.reload()
+            forgetVanishedFolders()
+        }
+        .onAppear {
+            expanded = Set(savedExpandedFolders.split(separator: "\n").map {
+                MeetingFolder($0.split(separator: "/").map(String.init))
+            })
+        }
+        .onChange(of: expanded) { _, expanded in
+            savedExpandedFolders = expanded
+                .map { $0.components.joined(separator: "/") }
+                .sorted()
+                .joined(separator: "\n")
         }
         .onChange(of: pipeline.isRunning, initial: true) { _, isRunning in
             // Lets the app delegate warn before quitting mid-run.
@@ -138,64 +168,22 @@ struct Sidebar: View {
             // Always present, even with nothing in it, so the button that adds
             // the first meeting has somewhere to live.
             Section {
-                ForEach(filteredMeetings) { meeting in
-                    // The whole row swaps to the field rather than growing one
-                    // inside the link: a text field inside a `NavigationLink`
-                    // spends its clicks on the link instead of on the text.
-                    if renaming == meeting.id {
-                        renameField
-                    } else {
-                        NavigationLink(value: SidebarSelection.meeting(meeting.id)) {
-                            MeetingRow(meeting: meeting)
-                        }
-                        .contextMenu {
-                            Button("Rename") { beginRename(meeting) }
-
-                            Button("Reveal Audio in Finder") {
-                                NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
-                            }
-                            .disabled(!meeting.audioExists)
-
-                            Divider()
-
-                            exportMenu(for: meeting)
-
-                            Divider()
-
-                            Button("Delete", role: .destructive) {
-                                meetingStore.delete(meeting.id)
-                            }
-                        }
+                if isSearching {
+                    // Search looks through every folder at once, and a match
+                    // is only useful if you can see where it was filed.
+                    ForEach(filteredMeetings) { meeting in
+                        meetingRow(meeting, showsFolder: true)
                     }
+                } else {
+                    rows(in: .root)
                 }
             } header: {
-                HStack(spacing: 4) {
-                    Text("Meetings")
-                    Spacer()
-                    Menu {
-                        Button("Transcribe Recording…") {
-                            importing = .recording
-                        }
-                        Button("Record a Meeting…") {
-                            openWindow(id: RecorderWindow.windowID)
-                        }
-                        Divider()
-                        Button("Import Transcript…") {
-                            importing = .transcript
-                        }
-                    } label: {
-                        Image(systemName: "plus")
-                            .imageScale(.large)
-                            .contentShape(Rectangle())
+                header
+                    // The header stands in for the top level, which has no
+                    // row of its own to drop onto.
+                    .dropDestination(for: SidebarItem.self) { items, _ in
+                        file(items, into: .root)
                     }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    // Without this the menu takes the width the header offers
-                    // it and the plus drifts away from the trailing edge.
-                    .fixedSize()
-                    .help("Add a meeting")
-                    .padding(.trailing, 4)
-                }
             }
         }
         .listStyle(.sidebar)
@@ -216,6 +204,157 @@ struct Sidebar: View {
         .searchable(text: $searchText, placement: .sidebar, prompt: "Search transcripts")
     }
 
+    private var header: some View {
+        HStack(spacing: 4) {
+            Text("Meetings")
+            Spacer()
+            Menu {
+                Button("Transcribe Recording…") {
+                    importing = .recording
+                }
+                Button("Record a Meeting…") {
+                    openWindow(id: RecorderWindow.windowID)
+                }
+                Divider()
+                Button("Import Transcript…") {
+                    importing = .transcript
+                }
+                Divider()
+                Button("New Folder") {
+                    newFolder(in: selectedFolder)
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .imageScale(.large)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            // Without this the menu takes the width the header offers
+            // it and the plus drifts away from the trailing edge.
+            .fixedSize()
+            .help("Add a meeting or a folder")
+            .padding(.trailing, 4)
+        }
+    }
+
+    /// A folder's rows: its folders first, then its meetings, as in Mail.
+    ///
+    /// Type-erased because it contains itself — a folder's rows include each
+    /// subfolder's.
+    private func rows(in folder: MeetingFolder) -> AnyView {
+        AnyView(Group {
+            ForEach(meetingStore.subfolders(of: folder), id: \.self) { child in
+                DisclosureGroup(isExpanded: expansion(of: child)) {
+                    rows(in: child)
+                } label: {
+                    folderRow(child)
+                }
+            }
+            ForEach(meetingStore.meetings(in: folder)) { meeting in
+                meetingRow(meeting, showsFolder: false)
+            }
+        })
+    }
+
+    @ViewBuilder
+    private func meetingRow(_ meeting: Meeting, showsFolder: Bool) -> some View {
+        // The whole row swaps to the field rather than growing one inside the
+        // link: a text field inside a `NavigationLink` spends its clicks on the
+        // link instead of on the text.
+        if renaming == .meeting(meeting.id) {
+            renameField
+        } else {
+            NavigationLink(value: SidebarSelection.meeting(meeting.id)) {
+                MeetingRow(
+                    meeting: meeting,
+                    folder: showsFolder ? meetingStore.folder(of: meeting.id) : nil
+                )
+            }
+            .draggable(SidebarItem.meeting(meeting.id))
+            // Dropped onto a meeting means dropped into the folder it is in,
+            // as in a Finder list — so there is always a row to aim for.
+            .dropDestination(for: SidebarItem.self) { items, _ in
+                file(items, into: meetingStore.folder(of: meeting.id) ?? .root)
+            }
+            .contextMenu {
+                Button("Rename") { beginRename(meeting) }
+
+                moveMenu(for: .meeting(meeting.id), from: meetingStore.folder(of: meeting.id) ?? .root)
+
+                Button("Reveal Audio in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
+                }
+                .disabled(!meeting.audioExists)
+
+                Divider()
+
+                exportMenu(for: meeting)
+
+                Divider()
+
+                Button("Delete", role: .destructive) {
+                    meetingStore.delete(meeting.id)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func folderRow(_ folder: MeetingFolder) -> some View {
+        if renaming == .folder(folder) {
+            renameField
+        } else {
+            Label(folder.name, systemImage: "folder")
+                .tag(SidebarSelection.folder(folder))
+                .draggable(SidebarItem.folder(folder.components))
+                .dropDestination(for: SidebarItem.self) { items, _ in
+                    file(items, into: folder)
+                }
+                .contextMenu {
+                    Button("New Folder") { newFolder(in: folder) }
+                    Button("Rename") { beginRename(folder) }
+                    moveMenu(for: .folder(folder), from: folder.parent ?? .root)
+
+                    Divider()
+
+                    // Nothing is lost by it, so it asks nothing: the meetings
+                    // and folders inside move up to take its place.
+                    Button("Delete Folder") { deleteFolder(folder) }
+                        .help("Its meetings and folders move up a level.")
+                }
+        }
+    }
+
+    /// Somewhere else to file a meeting or folder, for when dragging is
+    /// awkward — a long list, or a keyboard.
+    ///
+    /// Flat, indented by depth: a submenu per level would put the folder you
+    /// want three hovers away.
+    private func moveMenu(for item: SidebarSelection, from current: MeetingFolder) -> some View {
+        Menu("Move To") {
+            Button("Top Level") { move(item, to: .root) }
+                .disabled(current == .root)
+            if !meetingStore.folders.isEmpty {
+                Divider()
+            }
+            ForEach(meetingStore.folders, id: \.self) { folder in
+                Button(String(repeating: "    ", count: folder.components.count - 1) + folder.name) {
+                    move(item, to: folder)
+                }
+                .disabled(folder == current || {
+                    // A folder can't go into itself or anything inside it.
+                    if case .folder(let moving) = item { return moving.contains(folder) }
+                    return false
+                }())
+            }
+        }
+    }
+
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var filteredMeetings: [Meeting] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return meetingStore.meetings }
@@ -227,15 +366,112 @@ struct Sidebar: View {
         }
     }
 
+    // MARK: - Folders
+
+    /// Where New Folder puts the folder: inside the selected one, or beside
+    /// the selected meeting.
+    private var selectedFolder: MeetingFolder {
+        switch selection {
+        case .folder(let folder): folder
+        case .meeting(let id): meetingStore.folder(of: id) ?? .root
+        case nil: .root
+        }
+    }
+
+    /// Makes a folder and puts its name straight into a text field, as Finder
+    /// does — a folder is almost never meant to be called "New Folder".
+    private func newFolder(in parent: MeetingFolder) {
+        guard let folder = meetingStore.createFolder(in: parent) else { return }
+        setExpanded(parent, true)
+        selection = .folder(folder)
+        beginRename(folder)
+    }
+
+    private func deleteFolder(_ folder: MeetingFolder) {
+        meetingStore.deleteFolder(folder)
+        if case .folder(let selected) = selection, folder.contains(selected) {
+            selection = folder.parent.flatMap { $0.isRoot ? nil : .folder($0) }
+        }
+        forgetVanishedFolders()
+    }
+
+    private func file(_ items: [SidebarItem], into folder: MeetingFolder) -> Bool {
+        for item in items {
+            switch item {
+            case .meeting(let id): move(.meeting(id), to: folder)
+            case .folder(let components): move(.folder(MeetingFolder(components)), to: folder)
+            }
+        }
+        return !items.isEmpty
+    }
+
+    private func move(_ item: SidebarSelection, to folder: MeetingFolder) {
+        switch item {
+        case .meeting(let id):
+            meetingStore.move(id, to: folder)
+        case .folder(let moving):
+            guard let moved = meetingStore.moveFolder(moving, into: folder) else { return }
+            follow(moving, to: moved)
+        }
+        // Open where it went, so what was just filed doesn't vanish into a
+        // closed folder.
+        setExpanded(folder, true)
+    }
+
+    /// Keeps the selection, the field being typed in and the open folders
+    /// pointing at a folder that has been renamed or moved.
+    private func follow(_ old: MeetingFolder, to new: MeetingFolder) {
+        if case .folder(let selected) = selection {
+            selection = .folder(selected.moving(old, to: new))
+        }
+        expanded = Set(expanded.map { $0.moving(old, to: new) })
+    }
+
+    /// Selects a meeting and opens every folder above it, so a transcription
+    /// that just finished is on screen wherever it was filed.
+    private func reveal(_ id: UUID) {
+        var folder = meetingStore.folder(of: id)
+        while let current = folder, !current.isRoot {
+            setExpanded(current, true)
+            folder = current.parent
+        }
+        selection = .meeting(id)
+    }
+
+    /// Drops what no longer exists — removed here, or in Finder — from the
+    /// selection and the open folders.
+    private func forgetVanishedFolders() {
+        let existing = Set(meetingStore.folders)
+        if case .folder(let selected) = selection, !existing.contains(selected) {
+            selection = nil
+        }
+        let kept = expanded.intersection(existing)
+        if kept != expanded { expanded = kept }
+    }
+
+    // MARK: - Open folders
+
+    private func expansion(of folder: MeetingFolder) -> Binding<Bool> {
+        Binding(
+            get: { expanded.contains(folder) },
+            set: { setExpanded(folder, $0) }
+        )
+    }
+
+    private func setExpanded(_ folder: MeetingFolder, _ isExpanded: Bool) {
+        guard !folder.isRoot else { return }
+        if isExpanded { expanded.insert(folder) } else { expanded.remove(folder) }
+    }
+
     // MARK: - Renaming
 
-    /// The row a meeting is renamed in.
+    /// The row a meeting or folder is renamed in.
     ///
     /// Return commits and Escape abandons, and so does clicking away — the
     /// Finder's terms, because this looks exactly like renaming a file there
     /// and anything else would be a surprise. Committing an empty name is left
-    /// to ``Meeting/rename(to:)``, which refuses it and leaves the old title
-    /// standing.
+    /// to ``Meeting/rename(to:)`` and ``MeetingStore/renameFolder(_:to:)``,
+    /// which keep the old one.
     private var renameField: some View {
         TextField("Name", text: $renameDraft)
             .textFieldStyle(.roundedBorder)
@@ -259,13 +495,27 @@ struct Sidebar: View {
 
     private func beginRename(_ meeting: Meeting) {
         renameDraft = meeting.title
-        renaming = meeting.id
+        renaming = .meeting(meeting.id)
+    }
+
+    private func beginRename(_ folder: MeetingFolder) {
+        renameDraft = folder.name
+        renaming = .folder(folder)
     }
 
     private func commitRename() {
-        guard let id = renaming else { return }
+        guard let target = renaming else { return }
         renaming = nil
-        meetingStore.modify(id) { $0.rename(to: renameDraft) }
+        switch target {
+        case .meeting(let id):
+            meetingStore.modify(id) { $0.rename(to: renameDraft) }
+        case .folder(let folder):
+            let trimmed = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, trimmed != folder.name,
+                  let renamed = meetingStore.renameFolder(folder, to: trimmed)
+            else { return }
+            follow(folder, to: renamed)
+        }
     }
 
     // MARK: - Detail
@@ -279,6 +529,8 @@ struct Sidebar: View {
             } else {
                 EmptyPane { importing = .recording }
             }
+        case .folder(let folder):
+            FolderPane(folder: folder)
         case nil:
             EmptyPane { importing = .recording }
         }
@@ -374,10 +626,20 @@ private struct MeetingRow: View {
 
     let meeting: Meeting
 
+    /// Shown under the title in search results, which gather meetings from
+    /// every folder into one list.
+    var folder: MeetingFolder?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(meeting.title)
                 .lineLimit(1)
+            if let folder, !folder.isRoot {
+                Label(folder.components.joined(separator: " › "), systemImage: "folder")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             HStack(spacing: 4) {
                 Text(meeting.importedAt.formatted(date: .abbreviated, time: .omitted))
                 Text("·")
