@@ -157,7 +157,10 @@ struct ImportSheet: View {
                 // Only where there is something to choose — Danish and Apple's
                 // six. Everywhere else the language has settled it.
                 if modelChoices.count > 1 {
-                    Picker("Model:", selection: $model) {
+                    Picker("Model:", selection: Binding(
+                        get: { chosenModel },
+                        set: { model = $0 }
+                    )) {
                         ForEach(modelChoices, id: \.self) { choice in
                             Text(ManagedModel(for: choice)?.displayName ?? choice.displayName)
                                 .tag(choice)
@@ -211,6 +214,13 @@ struct ImportSheet: View {
                 }
             }
             .formStyle(.grouped)
+            // At its full height, always. The sheet is sized to fit when it
+            // opens, and a grouped form given that height afterwards would
+            // scroll rather than ask for more — so switching to a language with
+            // a Model picker, and its caption and perhaps a download notice,
+            // hid the rows below them. Measured on a stand-in: 153 of 275 pt
+            // shown without this, all 275 with it.
+            .fixedSize(horizontal: false, vertical: true)
 
             HStack {
                 Spacer()
@@ -218,7 +228,7 @@ struct ImportSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(confirmTitle) {
                     var memory = RememberedModels(rememberedModels)
-                    memory.remember(model, for: language)
+                    memory.remember(chosenModel, for: language)
                     rememberedModels = memory.stored
                     onTranscribe(TranscribeChoices(
                         language: language,
@@ -226,7 +236,7 @@ struct ImportSheet: View {
                         trim: trim,
                         suppressesBleed: separatesSources && suppressBleed,
                         folder: folder,
-                        model: model
+                        model: chosenModel
                     ))
                     dismiss()
                 }
@@ -379,12 +389,24 @@ struct ImportSheet: View {
     /// Nil for the languages Apple covers, whatever is on disk: macOS installs
     /// those itself on first use, so there is nothing to wait for.
     private var missingModel: ManagedModel? {
-        guard let required = ManagedModel(for: model) else { return nil }
+        guard let required = ManagedModel(for: chosenModel) else { return nil }
         return downloads.state(of: required) == .installed ? nil : required
     }
 
     private var modelChoices: [ASRBackendKind] {
         ASRBackendKind.choices(for: language)
+    }
+
+    /// The model to use, always one the current language offers.
+    ///
+    /// `model` is only brought into line with a new language by
+    /// `onChange(of: language)`, which runs after the view has drawn — so for
+    /// one frame after switching from Swedish to Danish it still says
+    /// KB-Whisper. Handed to the Model picker as-is, that is a selection with
+    /// no tag, which SwiftUI warns about and leaves undefined. Everything that
+    /// reads the model reads it through here instead.
+    private var chosenModel: ASRBackendKind {
+        modelChoices.contains(model) ? model : RememberedModels(rememberedModels).model(for: language)
     }
 
     /// Why one might pick either, in a line. What large-v3 is the
@@ -393,7 +415,7 @@ struct ImportSheet: View {
     ///
     /// Non-breaking hyphens, so "large-v3" is never split across lines.
     private var modelCaption: String {
-        switch (model, ASRBackendKind(transcribing: language)) {
+        switch (chosenModel, ASRBackendKind(transcribing: language)) {
         case (.roestWhisper, _):
             "Fine-tuned for Danish by the CoRal project, which measures it at "
             + "less than half Whisper large\u{2011}v3's errors on conversational Danish."
