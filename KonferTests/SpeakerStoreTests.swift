@@ -92,4 +92,54 @@ struct SpeakerStoreTests {
         store.merge(anna, into: bo)
         #expect(store.profile(bo)?.note == "Designer")
     }
+
+    @Test("A roster that can't be decoded is moved aside, not overwritten by the next enroll")
+    func corruptRosterSurvivesEnroll() throws {
+        let directory = try scratch()
+        let rosterURL = directory.appendingPathComponent("speakers.json")
+        let corrupt = Data(#"[{"createdAt" : 780000000, "embedding" : [0.5, 0.2"#.utf8)
+        try corrupt.write(to: rosterURL)
+
+        let store = SpeakerStore(directory: directory)
+        #expect(store.profiles.isEmpty)
+
+        store.enroll(name: "Anna", embedding: [1, 0])
+
+        let setAside = try unreadableRosters(in: directory)
+        #expect(setAside.count == 1)
+        #expect(try Data(contentsOf: try #require(setAside.first)) == corrupt)
+        #expect(SpeakerStore(directory: directory).profiles.map(\.name) == ["Anna"])
+    }
+
+    @Test("A roster that can't even be read is moved aside too")
+    func unreadableRosterIsSetAside() throws {
+        let directory = try scratch()
+        let rosterURL = directory.appendingPathComponent("speakers.json")
+        try Data("[]".utf8).write(to: rosterURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: rosterURL.path)
+
+        let store = SpeakerStore(directory: directory)
+        store.enroll(name: "Anna", embedding: [1, 0])
+
+        #expect(try unreadableRosters(in: directory).count == 1)
+        #expect(SpeakerStore(directory: directory).profiles.map(\.name) == ["Anna"])
+    }
+
+    @Test("With no roster on disk the store starts empty and sets nothing aside")
+    func missingRosterStartsEmpty() throws {
+        let directory = try scratch()
+
+        let store = SpeakerStore(directory: directory)
+        #expect(store.profiles.isEmpty)
+
+        store.enroll(name: "Anna", embedding: [1, 0])
+
+        #expect(try unreadableRosters(in: directory).isEmpty)
+        #expect(SpeakerStore(directory: directory).profiles.map(\.name) == ["Anna"])
+    }
+
+    private func unreadableRosters(in directory: URL) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("speakers.unreadable-") }
+    }
 }

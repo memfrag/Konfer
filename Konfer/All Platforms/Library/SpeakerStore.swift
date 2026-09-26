@@ -4,6 +4,7 @@
 
 import Foundation
 import Observation
+import OSLog
 
 /// The roster of people Konfer has learned to recognise.
 ///
@@ -20,6 +21,8 @@ final class SpeakerStore {
     /// same person. Deliberately conservative: a missed suggestion costs one
     /// rename, a wrong one costs trust in every label in the app.
     static let suggestionThreshold: Float = 0.45
+
+    private static let logger = Logger(subsystem: "pizza.martin.Konfer", category: "People")
 
     private(set) var profiles: [SpeakerProfile] = []
 
@@ -146,12 +149,71 @@ final class SpeakerStore {
 
     // MARK: - Persistence
 
+    /// Whether `save()` may write over `speakers.json`. False only when a
+    /// roster that could not be read also could not be moved out of the way.
+    @ObservationIgnored
+    private var canSave = true
+
+    /// Reads the roster, setting aside one that is there but can't be read.
+    ///
+    /// The roster is decoded all or nothing and every change saves the whole of
+    /// it, so a file that fails to decode — a schema change, a truncated write,
+    /// a hand edit — used to load as an empty roster, and the next enroll,
+    /// rename or note wrote that emptiness over it: every person and every
+    /// voice embedding gone for good. A missing file is simply a first launch;
+    /// anything else is moved aside as `speakers.unreadable-<date>.json` beside
+    /// it before the roster starts empty.
+    ///
+    /// Moved aside rather than refused, because refusing would leave People
+    /// silently discarding every name the user gives it until someone repaired
+    /// the file by hand, and there is nowhere in the app to say so. Recognition
+    /// only ever suggests, so starting over costs a few confirmations; the old
+    /// file is still there to recover. Only if the move itself fails does the
+    /// store stop saving, since then nothing but that file holds the roster.
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL) else { return }
-        profiles = (try? JSONDecoder().decode([SpeakerProfile].self, from: data)) ?? []
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch CocoaError.fileReadNoSuchFile {
+            return
+        } catch {
+            setAsideUnreadableRoster(because: error)
+            return
+        }
+
+        do {
+            profiles = try JSONDecoder().decode([SpeakerProfile].self, from: data)
+        } catch {
+            setAsideUnreadableRoster(because: error)
+        }
+    }
+
+    private func setAsideUnreadableRoster(because error: any Error) {
+        let formatter = ISO8601DateFormatter()
+        // No colons: Finder shows them as slashes.
+        formatter.formatOptions = [.withFullDate, .withTime, .withTimeZone]
+        let stamp = formatter.string(from: Date())
+        let destination = fileURL.deletingLastPathComponent()
+            .appendingPathComponent("speakers.unreadable-\(stamp).json")
+
+        do {
+            try FileManager.default.moveItem(at: fileURL, to: destination)
+            Self.logger.error("""
+                Could not read the People roster (\(error.localizedDescription, privacy: .public)); \
+                moved it to \(destination.lastPathComponent, privacy: .public) and started empty.
+                """)
+        } catch let moveError {
+            canSave = false
+            Self.logger.fault("""
+                Could not read the People roster (\(error.localizedDescription, privacy: .public)) \
+                or move it aside (\(moveError.localizedDescription, privacy: .public)); \
+                changes to People will not be saved.
+                """)
+        }
     }
 
     private func save() {
+        guard canSave else { return }
         LibraryLocation.ensureDirectoryExists()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

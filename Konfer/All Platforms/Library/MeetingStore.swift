@@ -68,6 +68,14 @@ final class MeetingStore {
         directory.appendingPathComponent("\(id.uuidString).json")
     }
 
+    /// Reads every meeting, skipping the files it can't.
+    ///
+    /// Skipping is safe here where it is not for the People roster, because
+    /// nothing is ever written back over a file this passes by: every write is
+    /// one meeting's own file, named by its id, and only meetings that loaded
+    /// (or were created with a fresh id) are ever written or deleted. A file
+    /// that fails to decode stays on disk untouched, invisible until whatever
+    /// broke it is fixed.
     private func load() {
         let fileManager = FileManager.default
         guard let files = try? fileManager.contentsOfDirectory(
