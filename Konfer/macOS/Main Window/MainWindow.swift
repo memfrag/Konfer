@@ -47,7 +47,9 @@ private struct RootView: View {
     var body: some View {
         Sidebar()
             .task {
-                guard !appSettings.hasCompletedOnboarding else { return }
+                // A test run's settings are fresh every time, so it would
+                // otherwise open the welcome window on every run.
+                guard !appSettings.hasCompletedOnboarding, !TestHost.isHostingTests else { return }
                 openWindow(id: WelcomeWindow.windowID)
             }
     }

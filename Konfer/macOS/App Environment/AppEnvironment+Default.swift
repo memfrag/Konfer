@@ -23,6 +23,10 @@ extension AppEnvironment {
     ///
     private static func makeAppEnvironment() -> AppEnvironment {
         #if DEBUG
+        // A throwaway library for a test run — see `TestHost`.
+        if TestHost.isHostingTests {
+            return .mock()
+        }
         if ProcessInfo.processInfo.environment["APP_ENVIRONMENT"]?.lowercased() == "mock" {
             return .mock()
         }

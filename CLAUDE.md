@@ -32,7 +32,11 @@ xcodebuild test -scheme "Konfer (Debug)" -destination 'platform=macOS,arch=arm64
   -only-testing:KonferTests/SpeakerAlignerTests
 ```
 
-Most tests are fixture-based — no models, no audio, no network. Three suites are
+Most tests are fixture-based — no models, no audio, no network. The test
+target is hosted in Konfer.app, so every run launches the app; `TestHost`
+detects that and gives it `AppEnvironment.mock()` — a throwaway library — and
+skips the library migration, the welcome window and Sparkle, because a test
+run once rewrote a real library on launch. Three suites are
 skipped unless you point them at a real recording, and they need the
 `TEST_RUNNER_` prefix so `xcodebuild` forwards the variable to the test runner:
 
