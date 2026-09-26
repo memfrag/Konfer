@@ -488,6 +488,11 @@ struct Sidebar: View {
     /// window around the sidebar they are a drag that missed. A recording or
     /// transcript opens its sheet, with `folder` chosen when it was dropped on
     /// one — one sheet at a time, so only the first.
+    ///
+    /// The result says whether anything was taken, for the older drop API that
+    /// asks. Discardable because macOS 26's `dropDestination(for:isEnabled:action:)`
+    /// — which the compiler now prefers wherever it fits — doesn't ask.
+    @discardableResult
     private func receive(_ drops: [LibraryDrop], into folder: MeetingFolder?) -> Bool {
         LibraryDrop.logger.notice("Dropped: \(drops.map { "\($0)" }.joined(separator: ", "), privacy: .public)")
         var accepted = false
