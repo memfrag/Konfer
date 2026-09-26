@@ -28,14 +28,16 @@ Two of them are worth calling out before the lists:
 |---|---|---|---|
 | [Apple `SpeechTranscriber`](https://developer.apple.com/documentation/speech/speechtranscriber) | English, German, Spanish, French, Italian, Portuguese | Part of macOS | Apple Inc. |
 | [KB-Whisper Large](https://huggingface.co/KBLab/kb-whisper-large) | Swedish | Apache-2.0 | KBLab, National Library of Sweden |
-| [Whisper large-v3](https://huggingface.co/openai/whisper-large-v3) | Danish, Dutch, Polish | Apache-2.0 | OpenAI |
+| [Røst v3](https://huggingface.co/CoRal-project/roest-v3-whisper-1.5b) | Danish | **Røst Model License** (AI Pubs Open RAIL-M, with use restrictions) | The CoRal project; licensed by Alvenir ApS |
+| [Whisper large-v3](https://huggingface.co/openai/whisper-large-v3) | Dutch, Polish, and Danish when chosen | Apache-2.0 | OpenAI |
 | [pyannote speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) | Every transcription | **CC BY 4.0** | Hervé Bredin and the pyannote authors; speaker embedding by WeSpeaker; PLDA parameters by BUT Speech@FIT |
 
 Apple's models are installed by macOS itself, per locale, and are governed by
 the macOS software licence rather than anything Konfer can grant.
 
 KB-Whisper is a fine-tune of OpenAI's Whisper large-v3, trained on more than
-50,000 hours of Swedish.
+50,000 hours of Swedish. Røst v3 is one too, trained on read and
+conversational Danish by the CoRal project.
 
 ### The conversions Konfer actually downloads
 
@@ -46,6 +48,7 @@ Konfer fetches CoreML conversions of them:
 |---|---|---|
 | [mickekringai/kb-whisper-coreml](https://huggingface.co/mickekringai/kb-whisper-coreml) | KB-Whisper, converted for WhisperKit | Apache-2.0 |
 | [argmaxinc/whisperkit-coreml](https://huggingface.co/argmaxinc/whisperkit-coreml) | Whisper large-v3, converted for WhisperKit | MIT |
+| [kramerthomas/roest-v3-whisper-1.5b-coreml](https://huggingface.co/kramerthomas/roest-v3-whisper-1.5b-coreml) | Røst v3, converted for WhisperKit at 8 bits; pinned to commit `3e9222be` | Røst Model License |
 | [FluidInference/speaker-diarization-coreml](https://huggingface.co/FluidInference/speaker-diarization-coreml) | pyannote community-1, converted for FluidAudio | **CC BY 4.0** (for the Community-1 files) |
 
 The diarization conversion's
@@ -58,6 +61,18 @@ does all of that. Its CC BY scope covers only the Community-1 files
 JSON files), which are the only ones FluidAudio's offline diarizer loads; the
 older `wespeaker` and `pyannote_segmentation` files in the same repository are
 excluded from it, and Konfer never downloads them.
+
+Røst's licence is not permissive in the way the others are. It is Alvenir
+ApS's, governed by Danish law, built on the AI Pubs Open RAIL-M licence, and
+it carries **use restrictions** that anyone distributing the model must pass
+on to the people using it — so the in-app entry summarises them rather than
+only linking. Among them: no using the model to break the law, to harm or
+discriminate, to impersonate people or synthesise a person's voice, to detect
+or infer a person's identity or personal characteristics, or to spread
+machine-generated content without saying it is machine-generated. Konfer only
+transcribes with it; recognising voices is done by the diarization embeddings
+above, never by Røst. The full terms are in the
+[conversion's LICENSE](https://huggingface.co/kramerthomas/roest-v3-whisper-1.5b-coreml/blob/main/LICENSE).
 
 ---
 

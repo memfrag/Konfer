@@ -19,8 +19,8 @@ import Foundation
 /// KB-Whisper is the National Library of Sweden's Whisper fine-tune, trained on
 /// over 50,000 hours of Swedish. Apple's `SpeechTranscriber` needs nothing for
 /// Konfer to download or manage, but its 30 supported locales include neither
-/// Swedish nor Danish, Dutch or Polish. Stock Whisper large-v3 covers those
-/// three; Swedish stays on KB-Whisper, which was trained for it.
+/// Swedish nor Danish, Dutch or Polish. Stock Whisper large-v3 covers the last
+/// three; Swedish stays on KB-Whisper and Danish on Røst, each trained for it.
 ///
 /// The language decides, with one exception. Each language has a default:
 ///
@@ -109,8 +109,8 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
             "Apple's on-device recognition. Fast, and nothing for Konfer to "
             + "download — macOS installs each language itself."
         case .whisperLargeV3:
-            "OpenAI's multilingual Whisper. About 7× real time, 3 GB, and the "
-            + "only option here for Danish, Dutch and Polish."
+            "OpenAI's multilingual Whisper. About 7× real time, 3 GB. Dutch "
+            + "and Polish, and Danish when chosen over Røst."
         case .kbWhisperSmall:
             "About 40× real time, 485 MB. Much better Swedish than Parakeet."
         case .kbWhisperLarge:

@@ -39,8 +39,10 @@ struct TranscriptionSettingsTab: View {
                     + "transcribes it. Apple's recognition covers 30 locales, "
                     + "and Swedish, Danish, Dutch and Polish aren't among them. "
                     + "KB-Whisper is the National Library of Sweden's Whisper "
-                    + "model, trained on more than 50,000 hours of Swedish; the "
-                    + "other three go to OpenAI's multilingual Whisper."
+                    + "model, trained on more than 50,000 hours of Swedish, and "
+                    + "Røst the CoRal project's, trained on Danish; Dutch and "
+                    + "Polish go to OpenAI's multilingual Whisper. Danish can use "
+                    + "that too — choose it when you transcribe."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

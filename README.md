@@ -105,22 +105,50 @@ no timestamps at all, and asking it for them (`<|timestamp|>`) makes its decoder
 degenerate into a repetition loop. Parakeet was removed once Apple's transcriber
 covered English better than it did.
 
-There is no model picker. Each row above has one sensible reading, so the
-language you declare for a recording decides:
+The language you declare for a recording decides the model, with one
+exception:
 
 | Language | Model | Why |
 |---|---|---|
 | English, German, Spanish, French, Italian, Portuguese | Apple | Nine times faster, and nothing for Konfer to download |
 | Swedish | KB-Whisper Large | Apple has no Swedish; this was trained for it |
-| Danish, Dutch, Polish | Whisper large-v3 | Neither of the others can do them |
+| Danish | **Røst v3**, or Whisper large-v3 if chosen | Trained for Danish; see below |
+| Dutch, Polish | Whisper large-v3 | None of the others can do them |
 
 Apple's `SpeechTranscriber` covers 30 locales — run
 `swift scripts/supported-locales.swift` to see them, and which are installed on
 a given Mac. Danish, Dutch and Polish are not among them, and neither is
-Swedish, which is why stock Whisper is here alongside KB-Whisper's Swedish
-specialist. Settings ▸ Transcription shows the routing and what each costs.
+Swedish, which is why stock Whisper is here alongside the two fine-tunes.
+Settings ▸ Transcription shows the routing and what each costs.
 `KONFER_BACKEND` forces one model regardless, for comparing them on the same
 recording.
+
+### Danish: Røst, with large-v3 beside it
+
+[Røst v3](https://huggingface.co/CoRal-project/roest-v3-whisper-1.5b) is the
+CoRal project's fine-tune of Whisper large-v3 on read and conversational
+Danish. Its authors measure it on CoRal-v3's test sets:
+
+| Character error | Røst v3 | Whisper large-v3 |
+|---|---|---|
+| Conversation | **11.6%** | 27.5% |
+| Read aloud | **4.5%** | 10.1% |
+
+Konfer runs an 8-bit WhisperKit conversion of it
+([kramerthomas/roest-v3-whisper-1.5b-coreml](https://huggingface.co/kramerthomas/roest-v3-whisper-1.5b-coreml),
+1.6 GB), pinned to a commit so a later push can't change it underneath a
+release. Those numbers are the unquantized model's, and it is one person's
+conversion — so Danish is the one language that offers a choice: the
+Transcribe sheet's Model picker has large-v3 beside Røst, remembers the last
+used, and Transcribe Again opens on the meeting's own model, so transcribing
+the same meeting with each is one switch. A meeting records the model that
+made it; older Danish meetings were large-v3's.
+
+Measured so far, on this Mac: the pinned download took 65 s and the first
+CoreML compile 118 s. A synthesized Danish sentence (macOS's Sara voice, 8.7 s)
+came back with word timings and every word right except a leading "Hej", heard
+as "Hi". That shows it loads and transcribes; it says nothing yet about a real
+meeting, which is the comparison still to make.
 
 ## What a real meeting costs
 

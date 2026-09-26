@@ -149,7 +149,8 @@ struct ImportSheet: View {
                 .help(
                     "The language decides which model transcribes: Apple's "
                     + "built-in recognition where it has the language, "
-                    + "KB-Whisper for Swedish, and OpenAI's Whisper for Danish, "
+                    + "KB-Whisper for Swedish, Røst for Danish (or OpenAI's "
+                    + "Whisper, if you choose it), and OpenAI's Whisper for "
                     + "Dutch and Polish."
                 )
 

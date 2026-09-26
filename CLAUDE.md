@@ -146,14 +146,19 @@ only `RecorderView` claims it (`enqueue(separatesSources:)`), and
 `Meeting.hasSeparateSources` remembers it for a re-run. See README ▸ "Two
 channels, one transcript".
 
-**Backends.** The model is derived, not chosen: `ASRBackendKind(transcribing:)`
-maps each of the ten `MeetingLanguage` cases to one of three backends — Apple
-for the six locales it covers, KB-Whisper Large for Swedish, stock Whisper
-large-v3 for Danish, Dutch and Polish. There is no model setting and no
-automatic case in either enum: the user declares the language in `ImportSheet`
-(defaulting to English) and everything follows. `KONFER_BACKEND` overrides the
-mapping for benchmarking, which is the only way to reach a model/language
-mismatch; `TranscriptionPipeline` guards that up front, before diarization
+**Backends.** The model follows the language: `ASRBackendKind(transcribing:)`
+gives each of the ten `MeetingLanguage` cases a default — Apple for the six
+locales it covers, KB-Whisper Large for Swedish, Røst v3 for Danish, stock
+Whisper large-v3 for Dutch and Polish. `ASRBackendKind.choices(for:)` lists what
+a language may use instead, and only Danish has more than one (Røst, then
+large-v3); only then does `ImportSheet` show a Model picker, remembered per
+language in `RememberedModels`. There is no model setting and no automatic
+case in either enum: the user declares the language (defaulting to English)
+and, for Danish, may pick the model. A `Meeting` records the model that made it
+(`transcriptionModel`); older meetings didn't, and `Meeting.model` falls back
+to `ASRBackendKind.assumed(forMeetingIn:)` — for Danish that is large-v3, what
+it used then, not today's default. `KONFER_BACKEND` overrides all of it for
+benchmarking, which is the only way to reach a model/language mismatch; `TranscriptionPipeline` guards that up front, before diarization
 spends a minute on the file. Transcripts written before the automatic option
 went away say `"auto"` on disk and decode as Swedish, which is what they ran
 as; `MeetingStore` silently drops what it cannot decode, so that fallback is
@@ -167,17 +172,21 @@ region. That is why the whole `TranscriptionBackend` protocol is
 language-parameterised.
 
 **Models are downloaded on purpose.** `ManagedModel` is the catalogue of what
-Konfer fetches itself (diarization, KB-Whisper Large, Whisper large-v3),
-wrapping three different mechanisms: FluidAudio's loader, `KBWhisperModelStore`
-(a hand-rolled fetch of a hardcoded file list, because KBLab's repo is not in
-WhisperKit's layout) and `WhisperKitModelStore` (WhisperKit's own downloader,
-for `argmaxinc/whisperkit-coreml`, whose folders carry files that list lacks).
+Konfer fetches itself (diarization, KB-Whisper Large, Whisper large-v3, Røst
+v3), wrapping three different mechanisms: FluidAudio's loader,
+`KBWhisperModelStore` (a hand-rolled fetch of a hardcoded file list, because
+KBLab's repo is not in WhisperKit's layout) and `WhisperKitModelStore`
+(WhisperKit's own downloader, for `argmaxinc/whisperkit-coreml`, whose folders
+carry files that list lacks). Røst is in WhisperKit's layout too, but in one
+person's repository, so it is pinned to a commit — and since
+`WhisperKit.download` can't name one, it comes through the `HubApiWrapper`
+snapshot underneath it, into the same place.
 Both stores write under one directory so Settings ▸ Models measures and deletes
 in one place. `ModelDownloadQueue` runs them one at a time and lives in
 `AppEnvironment` because `WelcomeWindow`, `ModelDownloadsWindow` and Settings
 all drive the same queue; its fetching is injected (`Fetcher`) so the state
 machine is testable without downloading gigabytes. `ImportSheet` disables
-Transcribe when the language's model is missing and `TranscriptionPipeline`
+Transcribe when the chosen model is missing and `TranscriptionPipeline`
 guards it again — Apple's languages and `KONFER_BACKEND` are exempt, the former
 because macOS installs those itself.
 
