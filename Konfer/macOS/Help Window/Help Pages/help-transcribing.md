@@ -10,10 +10,9 @@ Drop an audio or video file, or a voice memo, onto the Konfer window. You can al
 |---|---|
 | English, German, Spanish, French, Italian, Portuguese | Apple Speech, or Whisper Large v3 |
 | Swedish | KB-Whisper Large |
-| Danish | Røst v3, or Whisper Large v3 |
-| Dutch, Polish | Whisper Large v3 |
+| Danish, Dutch, Polish | Whisper Large v3 |
 
-**Model.** This appears only for the languages that have a choice, and Konfer remembers your choice for each language. Apple Speech is about nine times faster and needs no download. Whisper is worth a try when Apple struggles with accents, jargon or poor audio. For Danish, Røst was trained on Danish conversation.
+**Model.** This appears only for the languages that have a choice, and Konfer remembers your choice for each language. Apple Speech is about nine times faster and needs no download. Whisper is worth a try when Apple struggles with accents, jargon or poor audio.
 
 If the model isn't downloaded yet, the sheet says how big it is and offers **Download…**. **Transcribe** stays unavailable until the model is there. See [Models and Storage](konfer-help:models).
 

@@ -142,38 +142,7 @@ enum OpenSourceAttributions {
                 + "licensed. "
                 + "See https://huggingface.co/openai/whisper-large-v3"
         )),
-        ("Røst v3 model", roest),
         ("pyannote speaker diarization models", diarization)
-    ]
-
-    // Its licence requires its use restrictions to be passed on to the people
-    // using it, which is what the third paragraph is for — a link alone would
-    // meet the letter of it and not the point.
-    private static let roest = OpenSourceLicense(
-        name: "Røst Model License (AI Pubs Open RAIL-M)",
-        text: roestCredit
-    )
-
-    private static let roestCredit: [String] = [
-        "Danish speech recognition model Røst v3 (roest-v3-whisper-1.5b) by "
-            + "the CoRal project, a fine-tune of OpenAI's Whisper large-v3, made "
-            + "available by Alvenir ApS, Copenhagen, under a licence based on "
-            + "the AI Pubs Open RAIL-M licence and governed by Danish law. "
-            + "See https://huggingface.co/CoRal-project/roest-v3-whisper-1.5b",
-        "Konfer downloads a modified version of it: an 8-bit Core ML "
-            + "conversion for WhisperKit by kramerthomas, published at "
-            + "https://huggingface.co/kramerthomas/roest-v3-whisper-1.5b-coreml "
-            + "under the same licence.",
-        "The licence restricts how the model may be used. Among other things, "
-            + "it may not be used to break the law; to harm, harass or "
-            + "discriminate against anyone; to spread machine-generated "
-            + "content without saying that it is machine-generated; to "
-            + "impersonate people, including synthetic speech imitating a "
-            + "person; or to detect or infer a person's identity or personal "
-            + "characteristics. The full terms: "
-            + "https://huggingface.co/kramerthomas/roest-v3-whisper-1.5b-coreml/blob/main/LICENSE",
-        "Nielsen, D. S., et al. CoRal: A Danish Corpus and Benchmark for "
-            + "Automatic Speech Recognition. Alexandra Institute, 2024."
     ]
 
     // CC BY requires this credit rather than merely inviting it. Worded

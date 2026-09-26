@@ -85,7 +85,7 @@ remembers what it was told for when it is transcribed again. A side with nothing
 on it is not a side: recording with nothing playing costs one diarization pass,
 exactly as before.
 
-## Choosing a model## Choosing a model
+## Choosing a model
 
 Apple's `SpeechTranscriber` covers 30 locales and **Swedish is not one of them**,
 so Swedish has to go elsewhere. KB-Whisper is the National Library of Sweden's
@@ -112,45 +112,44 @@ two worth comparing, the Transcribe sheet also asks which:
 |---|---|---|
 | English, German, Spanish, French, Italian, Portuguese | **Apple**, or Whisper large-v3 if chosen | Nine times faster, and nothing for Konfer to download |
 | Swedish | KB-Whisper Large | Apple has no Swedish; this was trained for it |
-| Danish | **Røst v3**, or Whisper large-v3 if chosen | Trained for Danish; see below |
-| Dutch, Polish | Whisper large-v3 | None of the others can do them |
+| Danish, Dutch, Polish | Whisper large-v3 | None of the others can do them; for Danish, see below |
 
 Apple's `SpeechTranscriber` covers 30 locales — run
 `swift scripts/supported-locales.swift` to see them, and which are installed on
 a given Mac. Danish, Dutch and Polish are not among them, and neither is
-Swedish, which is why stock Whisper is here alongside the two fine-tunes.
+Swedish, which is why stock Whisper is here alongside KB-Whisper.
 Settings ▸ Transcription shows the routing and what each costs.
 `KONFER_BACKEND` forces one model regardless, for comparing them on the same
 recording.
 
-### Danish: Røst, with large-v3 beside it
+### Danish: Røst, tried and removed
 
 [Røst v3](https://huggingface.co/CoRal-project/roest-v3-whisper-1.5b) is the
 CoRal project's fine-tune of Whisper large-v3 on read and conversational
-Danish. Its authors measure it on CoRal-v3's test sets:
+Danish, and Konfer 1.4 made it Danish's default on the strength of its
+authors' numbers, from CoRal-v3's test sets:
 
 | Character error | Røst v3 | Whisper large-v3 |
 |---|---|---|
 | Conversation | **11.6%** | 27.5% |
 | Read aloud | **4.5%** | 10.1% |
 
-Konfer runs an 8-bit WhisperKit conversion of it
+Konfer ran an 8-bit WhisperKit conversion of it
 ([kramerthomas/roest-v3-whisper-1.5b-coreml](https://huggingface.co/kramerthomas/roest-v3-whisper-1.5b-coreml),
-1.6 GB), pinned to a commit so a later push can't change it underneath a
-release. Those numbers are the unquantized model's, and it is one person's
-conversion — so Danish offers a choice: the Transcribe sheet's Model picker
-has large-v3 beside Røst, remembers the last used, and Transcribe Again opens
-on the meeting's own model, so transcribing the same meeting with each is one
-switch. Apple's six languages offer large-v3 the same way, for the same
-reason: Apple was only ever measured for speed against Whisper, never for
-accuracy, and accents, jargon or poor audio may favour Whisper. A meeting records the model that
-made it; older Danish meetings were large-v3's.
+1.6 GB) — not the model those numbers were measured on, and one person's
+conversion — so large-v3 stayed beside it in the Transcribe sheet, for
+transcribing the same meeting with each. Done on a real Danish meeting,
+**Røst came out worse than stock large-v3**, and it was removed.
 
-Measured so far, on this Mac: the pinned download took 65 s and the first
-CoreML compile 118 s. A synthesized Danish sentence (macOS's Sara voice, 8.7 s)
-came back with word timings and every word right except a leading "Hej", heard
-as "Hi". That shows it loads and transcribes; it says nothing yet about a real
-meeting, which is the comparison still to make.
+Danish now has one model, large-v3, like Dutch and Polish. Meetings Røst
+made still open and still record that it made them — `ASRBackendKind` keeps
+the case for decoding alone, since `MeetingStore` drops what it cannot read —
+and the download is deleted on launch.
+
+Apple's six languages still offer large-v3 as an alternative, because Apple
+was only ever measured for speed against Whisper, never for accuracy, and
+accents, jargon or poor audio may favour Whisper. A meeting records the model
+that made it.
 
 ## What a real meeting costs
 

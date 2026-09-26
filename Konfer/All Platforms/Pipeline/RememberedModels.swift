@@ -7,8 +7,8 @@ import Foundation
 /// The model last used for each language that has a choice of them, so the
 /// Transcribe sheet opens on it next time.
 ///
-/// Kept as one short string, `"danish=roest-whisper"`, because it lives in user
-/// defaults beside the sheet. Anything it can't read, or a model the language
+/// Kept as one short string, `"english=whisper-large-v3"`, because it lives in
+/// user defaults beside the sheet. Anything it can't read, or a model the language
 /// no longer offers, is simply not remembered — the language's default takes
 /// over rather than a model that can't transcribe it.
 nonisolated struct RememberedModels: Equatable, Sendable {

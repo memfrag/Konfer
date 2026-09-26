@@ -6,8 +6,7 @@ Konfer downloads its speech models once, only when you ask. After that it never 
 |---|---|---|
 | Speaker identification | Working out who spoke when, in every language | 22 MB |
 | KB-Whisper Large | Swedish | 2.9 GB |
-| Røst v3 | Danish | 1.6 GB |
-| Whisper Large v3 | Dutch and Polish, and as the alternative for Danish and Apple's six languages | 3.1 GB |
+| Whisper Large v3 | Danish, Dutch and Polish, and as the alternative for Apple's six languages | 3.1 GB |
 
 English, German, Spanish, French, Italian and Portuguese use Apple Speech unless you choose otherwise. macOS installs that itself the first time you use a language, so it isn't listed here.
 

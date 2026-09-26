@@ -77,18 +77,19 @@ struct ModelDownloadQueueTests {
     }
 
     @Test(
-        "Dutch and Polish need stock Whisper",
-        arguments: [MeetingLanguage.dutch, .polish]
+        "Danish, Dutch and Polish need stock Whisper",
+        arguments: [MeetingLanguage.danish, .dutch, .polish]
     )
     func unservedLanguagesNeedWhisperLargeV3(_ language: MeetingLanguage) {
         #expect(ManagedModel(transcribing: language) == .whisperLargeV3)
     }
 
-    @Test("Danish needs Røst by default, and stock Whisper only when it is chosen")
-    func danishNeedsTheChosenModel() {
-        #expect(ManagedModel(transcribing: .danish) == .roestWhisper)
+    @Test("A chosen model needs its own download, and Apple's and Røst's need none")
+    func chosenModelsNeedTheirOwnDownload() {
         #expect(ManagedModel(for: .whisperLargeV3) == .whisperLargeV3)
         #expect(ManagedModel(for: .appleSpeech) == nil)
+        // Removed, so there is nothing to fetch — and nothing to list.
+        #expect(ManagedModel(for: .roestWhisper) == nil)
     }
 
     @Test("A model lists every language that can use it, chosen or by default")
@@ -100,7 +101,6 @@ struct ModelDownloadQueueTests {
             .english, .german, .spanish, .french, .italian, .portuguese,
             .danish, .dutch, .polish
         ])
-        #expect(ManagedModel.roestWhisper.languages == [.danish])
         // Every language needs it, so naming any subset would mislead.
         #expect(ManagedModel.diarization.languages.isEmpty)
     }
@@ -115,6 +115,33 @@ struct ModelDownloadQueueTests {
         let folder = WhisperKitModelStore.directory(for: .largeV3)
         #expect(folder.path.hasPrefix(KBWhisperModelStore.directory.path))
         #expect(folder.lastPathComponent == "openai_whisper-large-v3")
+    }
+
+    @Test("Røst's download is deleted, hub cache and all, and nothing beside it is touched")
+    func retiredModelsAreRemoved() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+
+        // The layout Konfer 1.4 left behind, as found on a real disk.
+        let owner = base.appending(path: "models/kramerthomas")
+        let roest = owner.appending(path: "roest-v3-whisper-1.5b-coreml")
+        let kept = base.appending(path: "models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3")
+        for folder in [
+            roest.appending(path: "CoRal-project_roest-v3-whisper-1.5b_1624MB/AudioEncoder.mlmodelc"),
+            roest.appending(path: ".cache/huggingface"),
+            kept.appending(path: "AudioEncoder.mlmodelc"),
+        ] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+
+        #expect(WhisperKitModelStore.removeRetired(from: base).count == 1)
+        #expect(!FileManager.default.fileExists(atPath: roest.path))
+        #expect(!FileManager.default.fileExists(atPath: owner.path))
+        #expect(FileManager.default.fileExists(atPath: kept.path))
+
+        // Every launch after the first finds nothing to do.
+        #expect(WhisperKitModelStore.removeRetired(from: base).isEmpty)
     }
 
     // MARK: - The queue

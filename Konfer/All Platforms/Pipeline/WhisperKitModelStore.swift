@@ -32,14 +32,9 @@ nonisolated enum WhisperKitModelStore {
 
     enum Variant: String, Sendable, CaseIterable {
 
-        /// OpenAI's Whisper large-v3. Multilingual; Dutch and Polish, and
-        /// Danish when Røst isn't wanted.
+        /// OpenAI's Whisper large-v3. Multilingual; Danish, Dutch and Polish,
+        /// and Apple's languages when it is chosen instead.
         case largeV3 = "openai_whisper-large-v3"
-
-        /// Røst v3, the CoRal project's Danish fine-tune of large-v3, as an
-        /// 8-bit WhisperKit conversion. Same architecture and vocabulary as
-        /// large-v3, so the same tokenizer.
-        case roestV3 = "CoRal-project_roest-v3-whisper-1.5b_1624MB"
 
         var folderName: String { rawValue }
 
@@ -47,20 +42,6 @@ nonisolated enum WhisperKitModelStore {
         var repository: String {
             switch self {
             case .largeV3: "argmaxinc/whisperkit-coreml"
-            case .roestV3: "kramerthomas/roest-v3-whisper-1.5b-coreml"
-            }
-        }
-
-        /// The commit to fetch, or nil for the repository's latest.
-        ///
-        /// Røst is pinned because it is one person's conversion: a later push
-        /// to that repository shouldn't change what Konfer transcribes with,
-        /// or what it has already told people they're downloading. Argmax's
-        /// own repository is the one WhisperKit itself tracks.
-        var revision: String? {
-            switch self {
-            case .largeV3: nil
-            case .roestV3: "3e9222be085107e7843c738c0078522644c5afeb"
             }
         }
 
@@ -69,7 +50,6 @@ nonisolated enum WhisperKitModelStore {
         var estimatedBytes: Int64 {
             switch self {
             case .largeV3: 3_100_000_000
-            case .roestV3: 1_630_000_000
             }
         }
     }
@@ -106,20 +86,6 @@ nonisolated enum WhisperKitModelStore {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         do {
-            // WhisperKit's own download has no way to name a commit, so a
-            // pinned variant is fetched through the hub wrapper underneath it,
-            // which lands it in the same place.
-            if let revision = variant.revision {
-                let snapshot = try await HubApiWrapper(downloadBase: KBWhisperModelStore.directory)
-                    .snapshot(
-                        from: HubApiWrapper.Repo(id: variant.repository, type: .models),
-                        revision: revision,
-                        matching: ["\(variant.folderName)/*"]
-                    ) { fraction in
-                        progress(fraction.fractionCompleted)
-                    }
-                return snapshot.appending(path: variant.folderName)
-            }
             return try await WhisperKit.download(
                 variant: variant.folderName,
                 downloadBase: KBWhisperModelStore.directory,
@@ -140,5 +106,38 @@ nonisolated enum WhisperKitModelStore {
 
     static func sizeOnDisk(_ variant: Variant) -> Int64 {
         ModelStorage.size(of: directory(for: variant))
+    }
+
+    // MARK: - Retired
+
+    /// Where Konfer 1.4 put Røst v3, the Danish model it has since dropped.
+    static let retiredRepositories = ["kramerthomas/roest-v3-whisper-1.5b-coreml"]
+
+    /// Deletes what Konfer downloaded for a model it no longer uses.
+    ///
+    /// Runs on every launch, and finds nothing after the first. Without it
+    /// Røst's 1.6 GB would stay on disk for good: the Models window no longer
+    /// lists it, so nothing there could delete it, yet Settings ▸ Models would
+    /// keep counting it. The repository's folder goes whole — the model and
+    /// the hub's `.cache` beside it — and then its owner's, which held nothing
+    /// else.
+    @discardableResult
+    static func removeRetired(from base: URL = KBWhisperModelStore.directory) -> [URL] {
+        let fileManager = FileManager.default
+        let hub = HubApiWrapper(downloadBase: base)
+        var removed: [URL] = []
+        for repository in retiredRepositories {
+            let folder = hub.localRepoLocation(HubApiWrapper.Repo(id: repository, type: .models))
+            guard fileManager.fileExists(atPath: folder.path),
+                  (try? fileManager.removeItem(at: folder)) != nil
+            else { continue }
+            removed.append(folder)
+
+            let owner = folder.deletingLastPathComponent()
+            if (try? fileManager.contentsOfDirectory(atPath: owner.path))?.isEmpty == true {
+                try? fileManager.removeItem(at: owner)
+            }
+        }
+        return removed
     }
 }

@@ -94,17 +94,11 @@ struct MeetingLanguageTests {
     }
 
     @Test(
-        "Dutch and Polish, which nothing else covers, go to stock Whisper",
-        arguments: [MeetingLanguage.dutch, .polish]
+        "Danish, Dutch and Polish, which nothing else covers, go to stock Whisper",
+        arguments: [MeetingLanguage.danish, .dutch, .polish]
     )
     func unservedLanguagesUseWhisperLargeV3(_ language: MeetingLanguage) {
         #expect(ASRBackendKind(transcribing: language) == .whisperLargeV3)
-    }
-
-    @Test("Danish goes to Røst, and offers stock Whisper as the alternative")
-    func danishOffersBothModels() {
-        #expect(ASRBackendKind(transcribing: .danish) == .roestWhisper)
-        #expect(ASRBackendKind.choices(for: .danish) == [.roestWhisper, .whisperLargeV3])
     }
 
     @Test(
@@ -116,8 +110,8 @@ struct MeetingLanguageTests {
     }
 
     @Test(
-        "Swedish, Dutch and Polish have exactly one model, so no choice to show",
-        arguments: [MeetingLanguage.swedish, .dutch, .polish]
+        "Swedish, Danish, Dutch and Polish have exactly one model, so no choice to show",
+        arguments: [MeetingLanguage.swedish, .danish, .dutch, .polish]
     )
     func someLanguagesHaveNoChoice(_ language: MeetingLanguage) {
         #expect(ASRBackendKind.choices(for: language) == [ASRBackendKind(transcribing: language)])
@@ -132,10 +126,11 @@ struct MeetingLanguageTests {
         }
     }
 
-    @Test("Røst is offered for Danish and nothing else")
-    func roestIsDanishOnly() {
+    @Test("Røst, removed, is offered for nothing and can transcribe nothing")
+    func roestIsRetired() {
         for language in MeetingLanguage.allCases {
-            #expect(ASRBackendKind.roestWhisper.supports(language) == (language == .danish))
+            #expect(!ASRBackendKind.choices(for: language).contains(.roestWhisper))
+            #expect(!ASRBackendKind.roestWhisper.supports(language))
         }
     }
 
@@ -149,10 +144,22 @@ struct MeetingLanguageTests {
 
     @Test("A meeting's recorded model survives a round trip")
     func recordedModelRoundTrips() throws {
-        var danish = meeting(language: .danish)
-        danish.transcriptionModel = .roestWhisper
+        var english = meeting(language: .english)
+        english.transcriptionModel = .whisperLargeV3
 
-        #expect(try decoded(try encoded(danish)).model == .roestWhisper)
+        #expect(try decoded(try encoded(english)).model == .whisperLargeV3)
+    }
+
+    @Test("A meeting Røst made still loads, and still says Røst made it")
+    func roestMeetingsStillDecode() throws {
+        // Written by 1.4, before Røst was removed. Failing to decode it would
+        // drop the meeting from the library, not merely relabel it.
+        var stored = try #require(
+            JSONSerialization.jsonObject(with: try encoded(meeting(language: .danish))) as? [String: Any]
+        )
+        stored["transcriptionModel"] = "roest-whisper"
+
+        #expect(try decoded(JSONSerialization.data(withJSONObject: stored)).model == .roestWhisper)
     }
 
     @Test("Apple is never handed a language it has no locale for")

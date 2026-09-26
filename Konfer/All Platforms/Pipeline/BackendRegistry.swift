@@ -23,7 +23,10 @@ actor BackendRegistry {
         case .kbWhisperSmall: WhisperKitBackend(source: .kbWhisper(.small))
         case .kbWhisperLarge: WhisperKitBackend(source: .kbWhisper(.large))
         case .whisperLargeV3: WhisperKitBackend(source: .whisperKit(.largeV3))
-        case .roestWhisper: WhisperKitBackend(source: .whisperKit(.roestV3))
+        case .roestWhisper:
+            // Supports no language, so `TranscriptionPipeline` refuses a job
+            // for it before asking here. See `ASRBackendKind.roestWhisper`.
+            preconditionFailure("Røst v3 was removed; nothing should ask to run it.")
         }
         backends[kind] = backend
         return backend

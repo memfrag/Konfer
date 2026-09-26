@@ -149,13 +149,13 @@ struct ImportSheet: View {
                 .help(
                     "The language decides which model transcribes: Apple's "
                     + "built-in recognition where it has the language, "
-                    + "KB-Whisper for Swedish, Røst for Danish, and OpenAI's "
-                    + "Whisper for Dutch and Polish. Danish and Apple's "
-                    + "languages can use OpenAI's Whisper instead."
+                    + "KB-Whisper for Swedish, and OpenAI's Whisper for "
+                    + "Danish, Dutch and Polish. Apple's languages can use "
+                    + "OpenAI's Whisper instead."
                 )
 
-                // Only where there is something to choose — Danish and Apple's
-                // six. Everywhere else the language has settled it.
+                // Only where there is something to choose — Apple's six.
+                // Everywhere else the language has settled it.
                 if modelChoices.count > 1 {
                     Picker("Model:", selection: Binding(
                         get: { chosenModel },
@@ -401,7 +401,7 @@ struct ImportSheet: View {
     ///
     /// `model` is only brought into line with a new language by
     /// `onChange(of: language)`, which runs after the view has drawn — so for
-    /// one frame after switching from Swedish to Danish it still says
+    /// one frame after switching from Swedish to English it still says
     /// KB-Whisper. Handed to the Model picker as-is, that is a selection with
     /// no tag, which SwiftUI warns about and leaves undefined. Everything that
     /// reads the model reads it through here instead.
@@ -410,21 +410,12 @@ struct ImportSheet: View {
     }
 
     /// Why one might pick either, in a line. What large-v3 is the
-    /// alternative *to* depends on the language, so the caption does too. The
-    /// numbers are the model authors', and say so.
-    ///
-    /// Non-breaking hyphens, so "large-v3" is never split across lines.
+    /// alternative *to* depends on the language, so the caption does too.
     private var modelCaption: String {
         switch (chosenModel, ASRBackendKind(transcribing: language)) {
-        case (.roestWhisper, _):
-            "Fine-tuned for Danish by the CoRal project, which measures it at "
-            + "less than half Whisper large\u{2011}v3's errors on conversational Danish."
         case (.appleSpeech, _):
             "Apple's built-in recognition. About nine times faster than "
             + "Whisper, and nothing to download."
-        case (.whisperLargeV3, .roestWhisper):
-            "OpenAI's multilingual Whisper, which transcribed Danish before Røst. "
-            + "Worth trying on the same recording to compare."
         case (.whisperLargeV3, .appleSpeech):
             "OpenAI's multilingual Whisper. About nine times slower than Apple's "
             + "and a 3 GB download, but worth trying where Apple struggles — "

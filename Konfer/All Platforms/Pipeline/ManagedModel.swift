@@ -30,13 +30,9 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
     /// The National Library of Sweden's Whisper fine-tune. Swedish only.
     case kbWhisperLarge
 
-    /// Stock multilingual Whisper. Dutch and Polish, and Danish or Apple's
+    /// Stock multilingual Whisper. Danish, Dutch and Polish, and Apple's
     /// languages on request.
     case whisperLargeV3
-
-    /// Røst v3, the CoRal project's Danish fine-tune of large-v3. Danish's
-    /// default.
-    case roestWhisper
 
     var id: String { rawValue }
 
@@ -47,7 +43,6 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
         case .diarization: "Speaker identification"
         case .kbWhisperLarge: "KB-Whisper Large"
         case .whisperLargeV3: "Whisper Large v3"
-        case .roestWhisper: "Røst v3"
         }
     }
 
@@ -60,22 +55,19 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
             "Transcribes Swedish. Trained on more than 50,000 hours of it by "
             + "the National Library of Sweden."
         case .whisperLargeV3:
-            "Transcribes Dutch and Polish, which neither Apple nor KB-Whisper "
-            + "can do, and Danish or Apple's languages when you choose it."
-        case .roestWhisper:
-            "Transcribes Danish. The CoRal project's fine-tune of Whisper, "
-            + "trained on read and conversational Danish."
+            "Transcribes Danish, Dutch and Polish, which neither Apple nor "
+            + "KB-Whisper can do, and Apple's languages when you choose it."
         }
     }
 
     /// The languages that can use this model, empty for one that everything
     /// needs. Includes a language that uses it only when chosen — large-v3 for
-    /// Danish — since deleting it takes that choice away.
+    /// English — since deleting it takes that choice away.
     var languages: [MeetingLanguage] {
         switch self {
         case .diarization:
             []
-        case .kbWhisperLarge, .whisperLargeV3, .roestWhisper:
+        case .kbWhisperLarge, .whisperLargeV3:
             MeetingLanguage.allCases.filter { language in
                 ASRBackendKind.choices(for: language).contains { ManagedModel(for: $0) == self }
             }
@@ -89,7 +81,6 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
         case .diarization: 22_000_000
         case .kbWhisperLarge: 2_900_000_000
         case .whisperLargeV3: WhisperKitModelStore.Variant.largeV3.estimatedBytes
-        case .roestWhisper: WhisperKitModelStore.Variant.roestV3.estimatedBytes
         }
     }
 
@@ -106,14 +97,13 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// The download a speech model needs, or `nil` for one Konfer doesn't
-    /// fetch — Apple's, which macOS installs, and KB-Whisper Small, which is
-    /// only reachable through `KONFER_BACKEND`.
+    /// fetch — Apple's, which macOS installs, KB-Whisper Small, which is
+    /// only reachable through `KONFER_BACKEND`, and Røst, which is gone.
     init?(for backend: ASRBackendKind) {
         switch backend {
-        case .appleSpeech, .kbWhisperSmall: return nil
+        case .appleSpeech, .kbWhisperSmall, .roestWhisper: return nil
         case .kbWhisperLarge: self = .kbWhisperLarge
         case .whisperLargeV3: self = .whisperLargeV3
-        case .roestWhisper: self = .roestWhisper
         }
     }
 
@@ -126,7 +116,6 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
         case .diarization: ModelStorage.isPopulated
         case .kbWhisperLarge: KBWhisperModelStore.isDownloaded(.large)
         case .whisperLargeV3: WhisperKitModelStore.isDownloaded(.largeV3)
-        case .roestWhisper: WhisperKitModelStore.isDownloaded(.roestV3)
         }
     }
 
@@ -139,7 +128,6 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
         case .diarization: ModelStorage.sizeOnDisk()
         case .kbWhisperLarge: ModelStorage.size(of: KBWhisperModelStore.directory(for: .large))
         case .whisperLargeV3: WhisperKitModelStore.sizeOnDisk(.largeV3)
-        case .roestWhisper: WhisperKitModelStore.sizeOnDisk(.roestV3)
         }
     }
 
@@ -161,9 +149,6 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
 
         case .whisperLargeV3:
             try await WhisperKitModelStore.download(.largeV3, progress: progress)
-
-        case .roestWhisper:
-            try await WhisperKitModelStore.download(.roestV3, progress: progress)
         }
     }
 
@@ -172,7 +157,6 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
         case .diarization: try ModelStorage.removeAll()
         case .kbWhisperLarge: try KBWhisperModelStore.remove(.large)
         case .whisperLargeV3: try WhisperKitModelStore.remove(.largeV3)
-        case .roestWhisper: try WhisperKitModelStore.remove(.roestV3)
         }
     }
 }

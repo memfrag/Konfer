@@ -76,8 +76,8 @@ struct TranscriptLanguageBar: View {
     }
 
     /// The language, and the model too where the language offers more than
-    /// one — "Danish · Røst v3" — since which one made a transcript is then
-    /// worth knowing, and the whole point of offering both.
+    /// one — "English · Whisper Large v3" — since which one made a transcript
+    /// is then worth knowing, and the whole point of offering both.
     private var languageCaption: String {
         guard ASRBackendKind.choices(for: meeting.language).count > 1 else {
             return meeting.language.displayName

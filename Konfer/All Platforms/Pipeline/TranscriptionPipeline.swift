@@ -222,8 +222,8 @@ final class TranscriptionPipeline {
             //    first — see `ImportSheet` — so reaching here means another
             //    caller slipped past. `KONFER_BACKEND` is exempt: benchmarking
             //    keeps the old lazy download.
-            //    The model that will actually run, which for Danish may not be
-            //    the language's default.
+            //    The model that will actually run, which may not be the
+            //    language's default.
             if Self.backendOverride == nil,
                let required = ManagedModel(for: job.backend),
                !required.isInstalled {
@@ -341,7 +341,7 @@ final class TranscriptionPipeline {
                 existing.suppressedBleed = job.suppressesBleed ? true : nil
                 existing.duration = audio.sourceDuration
                 // Which may differ from the first run's: transcribing the same
-                // Danish meeting with the other model is how they are compared.
+                // meeting with the other model is how they are compared.
                 existing.transcriptionModel = job.backend
 
                 // The language the re-run was told to use, which may not be

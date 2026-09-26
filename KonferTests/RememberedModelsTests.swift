@@ -14,16 +14,16 @@ struct RememberedModelsTests {
     func startsOnTheDefault() {
         let memory = RememberedModels("")
 
-        #expect(memory.model(for: .danish) == .roestWhisper)
+        #expect(memory.model(for: .english) == .appleSpeech)
         #expect(memory.model(for: .swedish) == .kbWhisperLarge)
     }
 
-    @Test("The model last used for Danish is the one it starts on next time, across a save")
+    @Test("The model last used for English is the one it starts on next time, across a save")
     func remembersAcrossASave() {
         var memory = RememberedModels("")
-        memory.remember(.whisperLargeV3, for: .danish)
+        memory.remember(.whisperLargeV3, for: .english)
 
-        #expect(RememberedModels(memory.stored).model(for: .danish) == .whisperLargeV3)
+        #expect(RememberedModels(memory.stored).model(for: .english) == .whisperLargeV3)
     }
 
     @Test("A model a language doesn't offer is never remembered for it")
@@ -37,10 +37,18 @@ struct RememberedModelsTests {
 
     @Test("Anything unreadable in what was saved is ignored, not trusted")
     func ignoresWhatItCantRead() {
-        let memory = RememberedModels("danish=whisper-large-v3;klingon=roest-whisper;dutch=roest-whisper;garbage")
+        let memory = RememberedModels("english=whisper-large-v3;klingon=roest-whisper;dutch=roest-whisper;garbage")
+
+        #expect(memory.model(for: .english) == .whisperLargeV3)
+        #expect(memory.model(for: .dutch) == .whisperLargeV3)
+        #expect(memory.stored == "english=whisper-large-v3")
+    }
+
+    @Test("Røst remembered for Danish by 1.4 is forgotten, and Danish starts on large-v3")
+    func forgetsRoest() {
+        let memory = RememberedModels("danish=roest-whisper")
 
         #expect(memory.model(for: .danish) == .whisperLargeV3)
-        #expect(memory.model(for: .dutch) == .whisperLargeV3)
-        #expect(memory.stored == "danish=whisper-large-v3")
+        #expect(memory.stored.isEmpty)
     }
 }

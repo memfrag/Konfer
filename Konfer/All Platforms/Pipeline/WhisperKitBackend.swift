@@ -8,14 +8,14 @@ import WhisperKit
 
 /// Speech recognition through WhisperKit, running Whisper on CoreML.
 ///
-/// Serves three different models. **KB-Whisper**, the National Library of
+/// Serves two kinds of model. **KB-Whisper**, the National Library of
 /// Sweden's fine-tune, does Swedish: on real meeting audio it recovers whole
 /// phrases Parakeet turns to noise — "Resans roll i att öka omsättningen"
-/// where Parakeet gives "Reslånser om i ökonsättning". **Røst v3**, the CoRal
-/// project's fine-tune of large-v3, does Danish. **Stock Whisper large-v3**
-/// does Dutch and Polish, which nothing else here can, and Danish when it is
-/// chosen instead. All return word timings, so speaker alignment and
-/// word-level playback highlighting work the same whichever it is.
+/// where Parakeet gives "Reslånser om i ökonsättning". **Stock Whisper
+/// large-v3** does Danish, Dutch and Polish, which nothing else here can, and
+/// Apple's languages when it is chosen instead. Both return word timings, so
+/// speaker alignment and word-level playback highlighting work the same
+/// whichever it is.
 ///
 /// The first load of a model compiles the CoreML bundles, which takes minutes
 /// at this size; every load after that is about a second.

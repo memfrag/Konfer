@@ -29,6 +29,10 @@ struct MacApp: App {
         // run on a throwaway library — see `TestHost`.
         if !TestHost.isHostingTests {
             LibraryMigration.migrateIfNeeded()
+            // Off the main thread: it is a directory tree, and usually absent.
+            Task.detached(priority: .utility) {
+                WhisperKitModelStore.removeRetired()
+            }
         }
         AppDesign.apply()
     }
