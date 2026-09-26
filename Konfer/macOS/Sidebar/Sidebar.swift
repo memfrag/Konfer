@@ -291,10 +291,9 @@ struct Sidebar: View {
                 moveMenu(for: .meeting(meeting.id), from: meetingStore.folder(of: meeting.id) ?? .root)
                 Button("New Folder with Meeting") { newFolder(containing: meeting.id) }
 
-                Button("Reveal Audio in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([meeting.audioURL])
-                }
-                .disabled(!meeting.audioExists)
+                Divider()
+
+                fileMenu(for: meeting)
 
                 Divider()
 
@@ -327,11 +326,54 @@ struct Sidebar: View {
 
                     Divider()
 
+                    // The same three a meeting's folder gets, for the folder
+                    // itself.
+                    let url = meetingStore.url(of: folder)
+                    Button("Show in Finder") { LibraryActions.revealInFinder(url) }
+                    Button("Open in \(LibraryActions.terminalName)") { LibraryActions.openInTerminal(url) }
+                    Button("Copy Path") { LibraryActions.copyPath(of: url) }
+
+                    Divider()
+
                     // Nothing is lost by it, so it asks nothing: the meetings
                     // and folders inside move up to take its place.
                     Button("Delete Folder") { deleteFolder(folder) }
                         .help("Its meetings and folders move up a level.")
                 }
+        }
+    }
+
+    /// The meeting as files: its transcript, its recording, and the folder
+    /// they're filed in.
+    ///
+    /// The terminal is named after whichever one will open, since it may not
+    /// be Terminal — see ``LibraryActions/terminalApplication``.
+    @ViewBuilder
+    private func fileMenu(for meeting: Meeting) -> some View {
+        let transcript = meetingStore.fileURL(of: meeting.id)
+        let folder = meetingStore.url(of: meetingStore.folder(of: meeting.id) ?? .root)
+
+        Button("Reveal Transcript in Finder") {
+            if let transcript { LibraryActions.revealInFinder(transcript) }
+        }
+        .disabled(transcript == nil)
+
+        Button("Reveal Audio in Finder") {
+            LibraryActions.revealInFinder(meeting.audioURL)
+        }
+        .disabled(!meeting.audioExists)
+
+        Button("Open Folder in \(LibraryActions.terminalName)") {
+            LibraryActions.openInTerminal(folder)
+        }
+
+        Button("Copy Transcript Path") {
+            if let transcript { LibraryActions.copyPath(of: transcript) }
+        }
+        .disabled(transcript == nil)
+
+        Button("Copy Folder Path") {
+            LibraryActions.copyPath(of: folder)
         }
     }
 
