@@ -3,6 +3,7 @@
 //
 
 import SwiftUI
+import MarkdownUI
 
 public struct HelpWindow: Scene {
 
