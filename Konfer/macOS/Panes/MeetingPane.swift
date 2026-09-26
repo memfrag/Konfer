@@ -47,6 +47,10 @@ struct MeetingPane: View {
     /// read it from.
     @State private var hasVideo = false
 
+    /// View ▸ Show Transcription Cuts. Off unless asked for; see
+    /// `TranscriptionCutsCommand`.
+    @AppStorage(TranscriptionCutsCommand.storageKey) private var showsCuts = false
+
     /// False for the first frame after a meeting opens, which shows a spinner
     /// where the transcript goes.
     ///
@@ -235,7 +239,7 @@ struct MeetingPane: View {
                 PlaybackBar(
                     player: player,
                     duration: meeting.duration,
-                    cuts: meeting.sliceCuts ?? [],
+                    cuts: showsCuts ? meeting.sliceCuts ?? [] : [],
                     waveform: waveform,
                     speakers: speakerSpans(in: meeting),
                     canTrim: waveform != nil,

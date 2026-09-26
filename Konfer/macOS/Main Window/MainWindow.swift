@@ -22,6 +22,7 @@ struct MainWindow: Scene {
             AboutCommand()
             CheckForUpdatesCommand(updater: updater)
             SidebarCommands()
+            TranscriptionCutsCommand()
             FindCommands()
             RecordCommand()
             ExportCommands()
