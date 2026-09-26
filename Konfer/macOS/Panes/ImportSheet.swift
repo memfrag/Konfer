@@ -48,6 +48,10 @@ struct ImportSheet: View {
     /// a meeting where it already is.
     var choosesFolder = true
 
+    /// The folder the recording was dropped on, which wins over the usual
+    /// starting folder — dropping it there was the choice.
+    var initialFolder: MeetingFolder?
+
     /// Language, expected speakers, trim, whether to silence the call on the
     /// microphone, and the folder to file the meeting in.
     let onTranscribe: (MeetingLanguage, Int?, KeptRange?, Bool, MeetingFolder) -> Void
@@ -82,6 +86,7 @@ struct ImportSheet: View {
         separatesSources: Bool = false,
         initialSuppressBleed: Bool = false,
         choosesFolder: Bool = true,
+        initialFolder: MeetingFolder? = nil,
         onTranscribe: @escaping (MeetingLanguage, Int?, KeptRange?, Bool, MeetingFolder) -> Void,
         onOpenExisting: ((Meeting) -> Void)? = nil
     ) {
@@ -94,6 +99,7 @@ struct ImportSheet: View {
         self.separatesSources = separatesSources
         self.initialSuppressBleed = initialSuppressBleed
         self.choosesFolder = choosesFolder
+        self.initialFolder = initialFolder
         self.onTranscribe = onTranscribe
         self.onOpenExisting = onOpenExisting
         _language = State(initialValue: initialLanguage)
@@ -200,7 +206,8 @@ struct ImportSheet: View {
         // Read once, when the sheet opens: the sidebar may change behind it,
         // and the picker shouldn't move while someone is looking at it.
         .onAppear {
-            folder = librarySelection.folderForNewMeeting(settings: appSettings, in: meetingStore)
+            folder = initialFolder
+                ?? librarySelection.folderForNewMeeting(settings: appSettings, in: meetingStore)
         }
         .onDisappear { player.unload() }
         // Playback stops at the right-hand handle, so listening to the edge of

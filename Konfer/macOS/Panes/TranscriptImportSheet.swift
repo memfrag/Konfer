@@ -18,6 +18,9 @@ struct TranscriptImportSheet: View {
     let url: URL
     let transcript: KlangTranscript
 
+    /// The folder the file was dropped on, which wins over the usual one.
+    var initialFolder: MeetingFolder?
+
     let onImport: (MeetingLanguage, MeetingFolder) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -75,7 +78,8 @@ struct TranscriptImportSheet: View {
         .padding(20)
         .frame(width: 420)
         .onAppear {
-            folder = librarySelection.folderForNewMeeting(settings: appSettings, in: meetingStore)
+            folder = initialFolder
+                ?? librarySelection.folderForNewMeeting(settings: appSettings, in: meetingStore)
         }
     }
 

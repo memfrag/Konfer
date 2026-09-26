@@ -12,6 +12,7 @@ struct Sidebar: View {
     @Environment(MeetingStore.self) private var meetingStore
     @Environment(TranscriptionPipeline.self) private var pipeline
     @Environment(LibrarySelection.self) private var librarySelection
+    @Environment(AppSettings.self) private var appSettings
 
     @State private var searchText: String = ""
     @State private var selection: SidebarSelection?
@@ -49,11 +50,10 @@ struct Sidebar: View {
         } detail: {
             detail
         }
-        .dropDestination(for: URL.self) { urls, _ in
-            // Files only: a dragged link is not a recording.
-            guard let url = urls.first, url.isFileURL else { return false }
-            offerImport(of: url)
-            return true
+        // Anywhere in the window that isn't a sidebar row: the folder picker
+        // starts where it would for any new meeting.
+        .dropDestination(for: LibraryDrop.self) { drops, _ in
+            receive(drops, into: nil)
         }
         .fileImporter(
             isPresented: Binding(
@@ -69,10 +69,18 @@ struct Sidebar: View {
         }
         .sheet(item: $pending) { pending in
             switch pending {
-            case .recording(let url, let alreadyTranscribed):
+            case .recording(let url, let alreadyTranscribed, let droppedOn, let isCopy):
                 // An imported file has no known channel layout, so it is never
                 // two-sided and the speakers question does not apply.
-                ImportSheet(url: url, alreadyTranscribed: alreadyTranscribed) { language, speakers, trim, _, folder in
+                ImportSheet(
+                    url: url,
+                    alreadyTranscribed: alreadyTranscribed,
+                    initialFolder: droppedOn
+                ) { language, speakers, trim, _, folder in
+                    // A copy is kept only once it is actually transcribed;
+                    // abandoned with the sheet, it stays in the staging folder
+                    // for the system to clear.
+                    let url = isCopy ? keep(url) : url
                     pipeline.enqueue(
                         url,
                         language: language,
@@ -83,8 +91,8 @@ struct Sidebar: View {
                 } onOpenExisting: { meeting in
                     selection = .meeting(meeting.id)
                 }
-            case .transcript(let url, let transcript):
-                TranscriptImportSheet(url: url, transcript: transcript) { language, folder in
+            case .transcript(let url, let transcript, let droppedOn):
+                TranscriptImportSheet(url: url, transcript: transcript, initialFolder: droppedOn) { language, folder in
                     importTranscript(transcript, from: url, language: language, folder: folder)
                 }
             }
@@ -189,8 +197,8 @@ struct Sidebar: View {
                 header
                     // The header stands in for the top level, which has no
                     // row of its own to drop onto.
-                    .dropDestination(for: SidebarItem.self) { items, _ in
-                        file(items, into: .root)
+                    .dropDestination(for: LibraryDrop.self) { drops, _ in
+                        receive(drops, into: .root)
                     }
             }
         }
@@ -207,7 +215,15 @@ struct Sidebar: View {
             }
         }
         .safeAreaBar(edge: .bottom, spacing: 0) {
-            SidebarFooter()
+            VStack(spacing: 0) {
+                // Stands in for the empty space above it, which can't take a
+                // drop — see `RecordingDropZone`. Treated like a drop on the
+                // window, so the folder picker starts where Settings says.
+                RecordingDropZone { drops in
+                    receive(drops, into: nil)
+                }
+                SidebarFooter()
+            }
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "Search transcripts")
     }
@@ -250,6 +266,12 @@ struct Sidebar: View {
     ///
     /// Type-erased because it contains itself — a folder's rows include each
     /// subfolder's.
+    ///
+    /// No drop handlers on the `ForEach`es, deliberately. A drop on the empty
+    /// space below the rows reaches the outline view as a drop onto the list
+    /// itself — child index -1 — and SwiftUI passes that straight to a
+    /// `ForEach`'s handler as an index, which crashes
+    /// (HomogeneousCollection.swift: "index -1 out of bounds").
     private func rows(in folder: MeetingFolder) -> AnyView {
         AnyView(Group {
             ForEach(meetingStore.subfolders(of: folder), id: \.self) { child in
@@ -282,8 +304,8 @@ struct Sidebar: View {
             .draggable(SidebarItem.meeting(meeting.id))
             // Dropped onto a meeting means dropped into the folder it is in,
             // as in a Finder list — so there is always a row to aim for.
-            .dropDestination(for: SidebarItem.self) { items, _ in
-                file(items, into: meetingStore.folder(of: meeting.id) ?? .root)
+            .dropDestination(for: LibraryDrop.self) { drops, _ in
+                receive(drops, into: meetingStore.folder(of: meeting.id) ?? .root)
             }
             .contextMenu {
                 Button("Rename") { beginRename(meeting) }
@@ -316,8 +338,8 @@ struct Sidebar: View {
             Label(folder.name, systemImage: "folder")
                 .tag(SidebarSelection.folder(folder))
                 .draggable(SidebarItem.folder(folder.components))
-                .dropDestination(for: SidebarItem.self) { items, _ in
-                    file(items, into: folder)
+                .dropDestination(for: LibraryDrop.self) { drops, _ in
+                    receive(drops, into: folder)
                 }
                 .contextMenu {
                     Button("New Folder") { newFolder(in: folder) }
@@ -458,6 +480,58 @@ struct Sidebar: View {
             selection = folder.parent.flatMap { $0.isRoot ? nil : .folder($0) }
         }
         forgetVanishedFolders()
+    }
+
+    /// Everything dropped on the window or a row.
+    ///
+    /// Meetings and folders are refiled, and only onto a row: dropped on the
+    /// window around the sidebar they are a drag that missed. A recording or
+    /// transcript opens its sheet, with `folder` chosen when it was dropped on
+    /// one — one sheet at a time, so only the first.
+    private func receive(_ drops: [LibraryDrop], into folder: MeetingFolder?) -> Bool {
+        LibraryDrop.logger.notice("Dropped: \(drops.map { "\($0)" }.joined(separator: ", "), privacy: .public)")
+        var accepted = false
+        var offered = false
+        for drop in drops {
+            switch drop {
+            case .item(let item):
+                guard let folder else { continue }
+                accepted = file([item], into: folder) || accepted
+            case .file(let url):
+                // Files only: a dragged link is not a recording.
+                guard url.isFileURL, !offered else { continue }
+                offerImport(of: url, into: folder)
+                offered = true
+                accepted = true
+            case .copy(let url):
+                guard !offered else { continue }
+                offerImport(of: url, into: folder, isCopy: true)
+                offered = true
+                accepted = true
+            }
+        }
+        return accepted
+    }
+
+    /// Moves a received copy — a Voice Memo — out of staging and into the
+    /// folder the Recorder saves to, named as it arrived and numbered if that
+    /// name is taken. A recording Konfer holds the only copy of belongs with
+    /// the ones it made.
+    ///
+    /// Left where it is if the move fails: transcribing from staging still
+    /// works, and only playback after the system clears it would not.
+    private func keep(_ staged: URL) -> URL {
+        let destination = LibraryName.available(
+            staged.deletingPathExtension().lastPathComponent,
+            extension: staged.pathExtension,
+            in: RecorderView.storedFolder(appSettings.recordingFolder)
+        )
+        do {
+            try FileManager.default.moveItem(at: staged, to: destination)
+            return destination
+        } catch {
+            return staged
+        }
     }
 
     private func file(_ items: [SidebarItem], into folder: MeetingFolder) -> Bool {
@@ -610,11 +684,13 @@ struct Sidebar: View {
     /// Reading a two-gigabyte video to establish that it isn't JSON is not a
     /// way to answer this, and "transcribe it" is the right guess for anything
     /// that isn't plainly a transcript already.
-    private func offerImport(of url: URL) {
+    private func offerImport(of url: URL, into folder: MeetingFolder? = nil, isCopy: Bool = false) {
         guard url.pathExtension.lowercased() == "json" else {
             pending = .recording(
                 url,
-                alreadyTranscribed: meetingStore.existingMeetings(forAudioAt: url.path).first
+                alreadyTranscribed: meetingStore.existingMeetings(forAudioAt: url.path).first,
+                folder: folder,
+                isCopy: isCopy
             )
             return
         }
@@ -623,7 +699,7 @@ struct Sidebar: View {
         // what is in the file has nothing to confirm, and a file that isn't a
         // transcript should say so instead of opening one.
         do {
-            pending = .transcript(url, try KlangTranscript.read(contentsOf: url))
+            pending = .transcript(url, try KlangTranscript.read(contentsOf: url), folder: folder)
         } catch let error as TranscriptImportError {
             importError = error
         } catch {
@@ -673,15 +749,17 @@ private enum ImportKind {
 /// A file waiting on its confirmation sheet.
 private enum PendingImport: Identifiable {
 
-    /// A recording, with the meeting already transcribed from it if there is one.
-    case recording(URL, alreadyTranscribed: Meeting?)
+    /// A recording, with the meeting already transcribed from it if there is
+    /// one, the folder it was dropped on if it was, and whether it is a copy
+    /// still waiting in staging.
+    case recording(URL, alreadyTranscribed: Meeting?, folder: MeetingFolder?, isCopy: Bool)
 
-    /// A transcript, already decoded.
-    case transcript(URL, KlangTranscript)
+    /// A transcript, already decoded, and the folder it was dropped on.
+    case transcript(URL, KlangTranscript, folder: MeetingFolder?)
 
     var id: String {
         switch self {
-        case .recording(let url, _), .transcript(let url, _): url.absoluteString
+        case .recording(let url, _, _, _), .transcript(let url, _, _): url.absoluteString
         }
     }
 }
