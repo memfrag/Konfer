@@ -7,7 +7,7 @@ The components below are a different matter. They are other people's work, and
 some of their licences do ask for attribution, which is what this file is for.
 
 The same list is shown inside the app, from the About window, and is built in
-`MacApp.swift`. Change one and change the other — with the exception of Apple's
+`OpenSourceAttributions.swift`. Change one and change the other — with the exception of Apple's
 own frameworks, which appear here but not there, because macOS is not software
 included in this product.
 
@@ -29,7 +29,7 @@ Two of them are worth calling out before the lists:
 | [Apple `SpeechTranscriber`](https://developer.apple.com/documentation/speech/speechtranscriber) | English, German, Spanish, French, Italian, Portuguese | Part of macOS | Apple Inc. |
 | [KB-Whisper Large](https://huggingface.co/KBLab/kb-whisper-large) | Swedish | Apache-2.0 | KBLab, National Library of Sweden |
 | [Whisper large-v3](https://huggingface.co/openai/whisper-large-v3) | Danish, Dutch, Polish | Apache-2.0 | OpenAI |
-| [pyannote speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) | Every transcription | **CC BY 4.0** | Hervé Bredin and the pyannote authors |
+| [pyannote speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) | Every transcription | **CC BY 4.0** | Hervé Bredin and the pyannote authors; speaker embedding by WeSpeaker; PLDA parameters by BUT Speech@FIT |
 
 Apple's models are installed by macOS itself, per locale, and are governed by
 the macOS software licence rather than anything Konfer can grant.
@@ -46,7 +46,18 @@ Konfer fetches CoreML conversions of them:
 |---|---|---|
 | [mickekringai/kb-whisper-coreml](https://huggingface.co/mickekringai/kb-whisper-coreml) | KB-Whisper, converted for WhisperKit | Apache-2.0 |
 | [argmaxinc/whisperkit-coreml](https://huggingface.co/argmaxinc/whisperkit-coreml) | Whisper large-v3, converted for WhisperKit | MIT |
-| [FluidInference/speaker-diarization-coreml](https://huggingface.co/FluidInference/speaker-diarization-coreml) | pyannote community-1, converted for FluidAudio | **CC BY 4.0** |
+| [FluidInference/speaker-diarization-coreml](https://huggingface.co/FluidInference/speaker-diarization-coreml) | pyannote community-1, converted for FluidAudio | **CC BY 4.0** (for the Community-1 files) |
+
+The diarization conversion's
+[NOTICE.md](https://huggingface.co/FluidInference/speaker-diarization-coreml/blob/main/NOTICE.md)
+asks that the credit name pyannote, WeSpeaker, BUT Speech@FIT and Fluid
+Inference, link the licence, say that the files are modified Core ML
+conversions, and keep the citations from its README — so the in-app entry
+does all of that. Its CC BY scope covers only the Community-1 files
+(`Segmentation`, `FBank`, `Embedding`, `PLDA`, `PldaRho` and the two PLDA
+JSON files), which are the only ones FluidAudio's offline diarizer loads; the
+older `wespeaker` and `pyannote_segmentation` files in the same repository are
+excluded from it, and Konfer never downloads them.
 
 ---
 
@@ -107,7 +118,21 @@ with the package that carries them.
 | [fastcluster](https://github.com/fastcluster/fastcluster) | FluidAudio | BSD-2-Clause | © 2011 Daniel Müllner; changes from v1.1.24 © Google Inc. |
 | [VBx](https://github.com/BUTSpeechFIT/VBx) | FluidAudio | Apache-2.0 | BUT Speech@FIT, Brno University of Technology |
 | [text-processing-rs](https://github.com/FluidInference/text-processing-rs) | FluidAudio | Apache-2.0 | Fluid Inference |
+| [NeMo Text Processing](https://github.com/NVIDIA/NeMo-text-processing) | FluidAudio, compiled into text-processing-rs | Apache-2.0 | © NVIDIA Corporation & Affiliates |
+| [rustfst](https://github.com/Garvys/rustfst) | FluidAudio, compiled into text-processing-rs | MIT OR Apache-2.0 | © Alexandre Caulier and the rustfst contributors |
+| [flate2](https://github.com/rust-lang/flate2-rs) | FluidAudio, compiled into text-processing-rs | MIT OR Apache-2.0 | © Alex Crichton and the flate2 contributors |
 | [swift-transformers](https://github.com/huggingface/swift-transformers) | WhisperKit | Apache-2.0 | © 2022 Hugging Face SAS, modified by Argmax, Inc. |
+| [bsdiff](http://www.daemonology.net/bsdiff/) 4.3 | Sparkle | BSD-2-Clause | © 2003–2005 Colin Percival |
+| [sais-lite](https://sites.google.com/site/yuta256/sais) | Sparkle | MIT | © 2008–2010 Yuta Mori |
+| [Ed25519](https://github.com/orlp/ed25519) | Sparkle | zlib | © 2015 Orson Peters |
+| `SUSignatureVerifier.m` | Sparkle | BSD-2-Clause | © 2011 Mark Hamlin |
+
+text-processing-rs reaches FluidAudio as a prebuilt framework, so what is
+compiled into it appears in no checkout; FluidAudio lists it in
+`ThirdPartyLicenses/NemoTextProcessing-LICENSE.md`, along with smaller MIT and
+Apache-2.0 crates (nom, miniz_oxide, bitflags, anyhow and others) that
+rustfst and flate2 pull in. Sparkle's four are in the EXTERNAL LICENSES part
+of its own `LICENSE`.
 
 Konfer's diarization is the pyannote community-1 pipeline reimplemented in
 Swift by FluidAudio: pyannote segmentation, speaker embeddings, and
@@ -130,7 +155,12 @@ Two traps worth knowing, because this file fell into both on the first pass:
   "no licence" when it actually means the opposite, a public domain dedication.
 - **A package's own licence is not the whole story.** WhisperKit and FluidAudio
   both vendor other people's code and declare it in a separate `NOTICES` or
-  `ThirdPartyLicenses` file, which is where the table above comes from.
+  `ThirdPartyLicenses` file, which is where the table above comes from. Sparkle
+  does the same inside its `LICENSE`, below the MIT text, which is how its four
+  entries were missed the first time.
+- **A model's licence can change under you.** The diarization conversion
+  started asking for a fuller credit in September 2026, with no change to
+  anything Konfer pins. Re-read the model cards too, not just the packages.
 
 If you change a dependency version, re-read rather than assume: this file is
 only as true as its last check.
