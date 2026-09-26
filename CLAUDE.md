@@ -296,6 +296,16 @@ reads `AppSettings.hasCompletedOnboarding` and a `Scene` has no environment. `Si
 meeting the pipeline just finished. Panes live in `macOS/Panes/`, with
 `WaveformScrubber` and `PlayerController` behind playback.
 
+**Help.** `HelpWindow` renders the Markdown pages in `Help Window/Help Pages/`
+with apparata's MarkdownUI (not gonzalezreal's), one page per `HelpTopic`.
+Pages link to each other as `konfer-help:<topic>`, and `<view tag="open-window"
+…/>` / `<view tag="open-settings" …/>` become buttons (`HelpAction`). The
+pages describe the UI in its own words, so **a change to a user-visible label,
+menu or flow should update the page that describes it**. `HelpPagesTests` catches
+missing files, broken links and unknown tags, but not text that has gone stale.
+Every page is prefixed `help-` because the synchronized folder flattens
+resources into one directory.
+
 ## Conventions
 
 - Every file starts with `//  Copyright © 2026 Martin Johannesson. All rights reserved.`
