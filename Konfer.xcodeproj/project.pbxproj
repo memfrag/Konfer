@@ -225,7 +225,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2700;
 				ORGANIZATIONNAME = "Martin Johannesson";
 			};
 			buildConfigurationList = 159EF113C480C86C71B02144 /* Build configuration list for PBXProject "Konfer" */;
@@ -375,9 +375,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = DefaultAppIcon;
+				CODE_SIGN_ENTITLEMENTS = Konfer/macOS/Konfer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_ENTITLEMENTS = Konfer/macOS/Konfer.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1.3.2;
@@ -472,9 +472,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = DefaultAppIcon;
+				CODE_SIGN_ENTITLEMENTS = Konfer/macOS/Konfer.entitlements;
 				CODE_SIGN_IDENTITY = "Developer ID Application: Martin Johannesson (CQXRBQKG85)";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
-				CODE_SIGN_ENTITLEMENTS = Konfer/macOS/Konfer.entitlements;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1.3.2;
