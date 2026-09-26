@@ -27,6 +27,7 @@ struct MainWindow: Scene {
             ExportCommands()
             HelpCommands()
             ModelCommands()
+            PeopleCommands()
 
         }
     }

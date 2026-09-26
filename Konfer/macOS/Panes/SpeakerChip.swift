@@ -18,6 +18,8 @@ struct SpeakerChip: View {
     let onRename: (String) -> Void
     let onAcceptSuggestion: () -> Void
 
+    @Environment(SpeakerStore.self) private var speakerStore
+
     @State private var isEditing = false
     @State private var draft = ""
     @FocusState private var isFieldFocused: Bool
@@ -79,12 +81,23 @@ struct SpeakerChip: View {
                 .font(.caption)
         }
         .buttonStyle(.link)
-        .help(
-            String(
-                format: "Voice match, distance %.2f. Nothing is renamed until you accept.",
-                suggestion.distance
-            )
+        .help(suggestionHelp(suggestion))
+    }
+
+    /// Leads with the person's note when they have one: two people can sound
+    /// alike, and "Anna, product lead at the agency" is what settles which
+    /// Anna before accepting.
+    ///
+    /// Read from the roster rather than from the suggestion, which is stored
+    /// with the meeting and would keep whatever the note said when the
+    /// meeting was transcribed.
+    private func suggestionHelp(_ suggestion: EnrollmentSuggestion) -> String {
+        let match = String(
+            format: "Voice match, distance %.2f. Nothing is renamed until you accept.",
+            suggestion.distance
         )
+        guard let note = speakerStore.profile(suggestion.profileID)?.note else { return match }
+        return "\(suggestion.name): \(note)\n\n\(match)"
     }
 
     private func commit() {

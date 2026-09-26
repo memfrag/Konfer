@@ -20,13 +20,23 @@ nonisolated struct SpeakerProfile: Identifiable, Codable, Hashable, Sendable {
     var createdAt: Date
     var updatedAt: Date
 
+    /// A line or two about who this is, written by the user — shown beside
+    /// the name, and on a suggestion, where it tells two similar voices apart.
+    ///
+    /// Optional, and it has to stay that way: the roster is decoded all or
+    /// nothing, so a required field would fail every `speakers.json` written
+    /// before it existed, load an empty roster, and the next save would write
+    /// that emptiness over everyone.
+    var note: String?
+
     init(
         id: UUID = UUID(),
         name: String,
         embedding: [Float],
         sampleCount: Int = 1,
         createdAt: Date = Date(),
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        note: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -34,6 +44,7 @@ nonisolated struct SpeakerProfile: Identifiable, Codable, Hashable, Sendable {
         self.sampleCount = sampleCount
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.note = note
     }
 
     /// Folds a new observation into the running mean.

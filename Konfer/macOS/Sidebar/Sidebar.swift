@@ -197,15 +197,19 @@ struct Sidebar: View {
                     .padding(.trailing, 4)
                 }
             }
-
-            Section("Library") {
-                NavigationLink(value: SidebarSelection.speakers) {
-                    Label("People", systemImage: "person.2")
-                }
-            }
         }
         .listStyle(.sidebar)
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 340)
+        // On the sidebar's own column, which is what puts it in the part of
+        // the toolbar above the sidebar rather than over the transcript.
+        .toolbar {
+            ToolbarItem {
+                Button("People", systemImage: "person.2") {
+                    openWindow(id: PeopleWindow.windowID)
+                }
+                .help("People Konfer recognises")
+            }
+        }
         .safeAreaBar(edge: .bottom, spacing: 0) {
             SidebarFooter()
         }
@@ -275,8 +279,6 @@ struct Sidebar: View {
             } else {
                 EmptyPane { importing = .recording }
             }
-        case .speakers:
-            SpeakersPane()
         case nil:
             EmptyPane { importing = .recording }
         }

@@ -31,6 +31,12 @@ final class SpeakerStore {
         load()
     }
 
+    // MARK: - Access
+
+    func profile(_ id: UUID) -> SpeakerProfile? {
+        profiles.first { $0.id == id }
+    }
+
     // MARK: - Matching
 
     /// The closest profile to `embedding`, if it is close enough to suggest.
@@ -100,6 +106,20 @@ final class SpeakerStore {
         save()
     }
 
+    /// Replaces a person's note; an empty one removes it.
+    ///
+    /// Leaves `updatedAt` alone, unlike a rename: the People window shows it
+    /// as when the person was last heard, and writing about someone is not
+    /// hearing them.
+    func setNote(_ note: String, for profileID: UUID) {
+        guard let index = profiles.firstIndex(where: { $0.id == profileID }) else { return }
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = trimmed.isEmpty ? nil : trimmed
+        guard profiles[index].note != value else { return }
+        profiles[index].note = value
+        save()
+    }
+
     func delete(_ profileID: UUID) {
         profiles.removeAll { $0.id == profileID }
         save()
@@ -115,6 +135,11 @@ final class SpeakerStore {
 
         let absorbed = profiles[sourceIndex]
         profiles[destinationIndex].reinforce(with: absorbed.embedding)
+        // The person being kept wins, but a note is not something to lose
+        // just because it was written on the other half of the same person.
+        if profiles[destinationIndex].note == nil {
+            profiles[destinationIndex].note = absorbed.note
+        }
         profiles.remove(at: sourceIndex)
         save()
     }

@@ -31,6 +31,7 @@ struct MacApp: App {
         MainWindow(updater: updaterController.updater)
         RecorderWindow()
         ModelDownloadsWindow()
+        PeopleWindow()
         WelcomeWindow()
         SettingsWindow()
         AboutWindow(developedBy: "Martin Johannesson",
