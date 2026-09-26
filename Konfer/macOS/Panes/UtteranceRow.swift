@@ -175,7 +175,12 @@ struct UtteranceRow: View {
             } label: {
                 nameLabel
             }
-            .menuStyle(.borderlessButton)
+            // A plain button rather than a borderless one: the borderless
+            // style insets its label by a few points, which set the name off
+            // the left edge of the text beneath it — and only on rows with
+            // someone to reassign to, since the others show a bare label.
+            .menuStyle(.button)
+            .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Reassign this line to another speaker")
