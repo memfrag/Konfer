@@ -1,5 +1,5 @@
 {
-  "originHash" : "66e824eeca649bf73cd1a4952ae5106b06f501dd92e16572a7c8f01605836ab4",
+  "originHash" : "ee80fc9b24dda61d117f0cd2b976a9c8dbf4321c50df9cd54dca770f6a709599",
   "pins" : [
     {
       "identity" : "approuting",
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apparata/MarkdownUI.git",
       "state" : {
-        "revision" : "15f6da3007e992e930d73e277e4829f6785c1047",
-        "version" : "0.9.1"
+        "revision" : "b89150eb44c8e9eea4e206a1787944750a696988",
+        "version" : "1.0.3"
       }
     },
     {

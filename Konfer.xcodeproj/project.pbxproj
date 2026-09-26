@@ -688,7 +688,7 @@
 			repositoryURL = "https://github.com/apparata/MarkdownUI.git";
 			requirement = {
 				kind = exactVersion;
-				version = 0.9.1;
+				version = 1.0.3;
 			};
 		};
 		EA7EAA91D6AEF9EA5B12C764 /* XCRemoteSwiftPackageReference "SwiftUIToolbox" */ = {
