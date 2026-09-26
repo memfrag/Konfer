@@ -149,13 +149,13 @@ struct ImportSheet: View {
                 .help(
                     "The language decides which model transcribes: Apple's "
                     + "built-in recognition where it has the language, "
-                    + "KB-Whisper for Swedish, Røst for Danish (or OpenAI's "
-                    + "Whisper, if you choose it), and OpenAI's Whisper for "
-                    + "Dutch and Polish."
+                    + "KB-Whisper for Swedish, Røst for Danish, and OpenAI's "
+                    + "Whisper for Dutch and Polish. Danish and Apple's "
+                    + "languages can use OpenAI's Whisper instead."
                 )
 
-                // Only where there is something to choose — today, Danish.
-                // Everywhere else the language has settled it.
+                // Only where there is something to choose — Danish and Apple's
+                // six. Everywhere else the language has settled it.
                 if modelChoices.count > 1 {
                     Picker("Model:", selection: $model) {
                         ForEach(modelChoices, id: \.self) { choice in
@@ -387,17 +387,26 @@ struct ImportSheet: View {
         ASRBackendKind.choices(for: language)
     }
 
-    /// Why one might pick either, in a line — the numbers are the model
-    /// authors', and say so.
+    /// Why one might pick either, in a line. What large-v3 is the
+    /// alternative *to* depends on the language, so the caption does too. The
+    /// numbers are the model authors', and say so.
+    ///
+    /// Non-breaking hyphens, so "large-v3" is never split across lines.
     private var modelCaption: String {
-        switch model {
-        case .roestWhisper:
-            // A non-breaking hyphen, so "large-v3" isn't split across lines.
+        switch (model, ASRBackendKind(transcribing: language)) {
+        case (.roestWhisper, _):
             "Fine-tuned for Danish by the CoRal project, which measures it at "
             + "less than half Whisper large\u{2011}v3's errors on conversational Danish."
-        case .whisperLargeV3:
+        case (.appleSpeech, _):
+            "Apple's built-in recognition. About nine times faster than "
+            + "Whisper, and nothing to download."
+        case (.whisperLargeV3, .roestWhisper):
             "OpenAI's multilingual Whisper, which transcribed Danish before Røst. "
             + "Worth trying on the same recording to compare."
+        case (.whisperLargeV3, .appleSpeech):
+            "OpenAI's multilingual Whisper. About nine times slower than Apple's "
+            + "and a 3 GB download, but worth trying where Apple struggles — "
+            + "accents, jargon, poor audio."
         default:
             model.summary
         }

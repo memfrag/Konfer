@@ -150,9 +150,10 @@ channels, one transcript".
 gives each of the ten `MeetingLanguage` cases a default — Apple for the six
 locales it covers, KB-Whisper Large for Swedish, Røst v3 for Danish, stock
 Whisper large-v3 for Dutch and Polish. `ASRBackendKind.choices(for:)` lists what
-a language may use instead, and only Danish has more than one (Røst, then
-large-v3); only then does `ImportSheet` show a Model picker, remembered per
-language in `RememberedModels`. There is no model setting and no automatic
+a language may use instead: Danish offers large-v3 beside Røst, and Apple's six
+languages offer it beside Apple; Swedish, Dutch and Polish have one model.
+Only where there are two does `ImportSheet` show a Model picker, remembered
+per language in `RememberedModels`. There is no model setting and no automatic
 case in either enum: the user declares the language (defaulting to English)
 and, for Danish, may pick the model. A `Meeting` records the model that made it
 (`transcriptionModel`); older meetings didn't, and `Meeting.model` falls back

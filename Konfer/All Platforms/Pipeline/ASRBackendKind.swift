@@ -32,10 +32,12 @@ import Foundation
 ///   against large-v3's 27.5%.
 /// - **Whisper large-v3** for Dutch and Polish, which none of the others do.
 ///
-/// The exception is Danish, which also offers large-v3 — see
-/// ``choices(for:)``. Røst is one person's quantized conversion and not yet
-/// measured here, and transcribing the same meeting with both is the way to
-/// find out whether it earns its place.
+/// Some languages also offer large-v3 as an alternative — see
+/// ``choices(for:)``. Danish, because Røst is one person's quantized
+/// conversion and not yet measured here. Apple's six, because Apple was never
+/// measured against Whisper on them either — only for speed, nine times
+/// faster — and accents, jargon or poor audio may go the other way.
+/// Transcribing the same meeting with each is how to find out.
 ///
 public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable {
 
@@ -62,10 +64,15 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
     /// The models a language can be transcribed with, the default first.
     /// Only a language with more than one gets a choice in the Transcribe
     /// sheet.
+    ///
+    /// Swedish, Dutch and Polish have none: KB-Whisper is the best Swedish
+    /// measured, and large-v3 is the only model here for the other two.
     public static func choices(for language: MeetingLanguage) -> [ASRBackendKind] {
-        switch language {
-        case .danish: [.roestWhisper, .whisperLargeV3]
-        default: [ASRBackendKind(transcribing: language)]
+        switch ASRBackendKind(transcribing: language) {
+        case .roestWhisper, .appleSpeech:
+            [ASRBackendKind(transcribing: language), .whisperLargeV3]
+        default:
+            [ASRBackendKind(transcribing: language)]
         }
     }
 
@@ -110,7 +117,7 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
             + "download — macOS installs each language itself."
         case .whisperLargeV3:
             "OpenAI's multilingual Whisper. About 7× real time, 3 GB. Dutch "
-            + "and Polish, and Danish when chosen over Røst."
+            + "and Polish, and any language Apple or Røst does when chosen instead."
         case .kbWhisperSmall:
             "About 40× real time, 485 MB. Much better Swedish than Parakeet."
         case .kbWhisperLarge:

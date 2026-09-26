@@ -30,7 +30,8 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
     /// The National Library of Sweden's Whisper fine-tune. Swedish only.
     case kbWhisperLarge
 
-    /// Stock multilingual Whisper. Dutch and Polish, and Danish on request.
+    /// Stock multilingual Whisper. Dutch and Polish, and Danish or Apple's
+    /// languages on request.
     case whisperLargeV3
 
     /// Røst v3, the CoRal project's Danish fine-tune of large-v3. Danish's
@@ -60,7 +61,7 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
             + "the National Library of Sweden."
         case .whisperLargeV3:
             "Transcribes Dutch and Polish, which neither Apple nor KB-Whisper "
-            + "can do, and Danish when you choose it over Røst."
+            + "can do, and Danish or Apple's languages when you choose it."
         case .roestWhisper:
             "Transcribes Danish. The CoRal project's fine-tune of Whisper, "
             + "trained on read and conversational Danish."

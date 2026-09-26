@@ -94,8 +94,12 @@ struct ModelDownloadQueueTests {
     @Test("A model lists every language that can use it, chosen or by default")
     func modelsListTheirLanguages() {
         #expect(ManagedModel.kbWhisperLarge.languages == [.swedish])
-        // Danish is on it too: deleting it takes Danish's second choice away.
-        #expect(ManagedModel.whisperLargeV3.languages == [.danish, .dutch, .polish])
+        // Every language that can choose it is on it too: deleting it takes
+        // their second choice away.
+        #expect(Set(ManagedModel.whisperLargeV3.languages) == [
+            .english, .german, .spanish, .french, .italian, .portuguese,
+            .danish, .dutch, .polish
+        ])
         #expect(ManagedModel.roestWhisper.languages == [.danish])
         // Every language needs it, so naming any subset would mislead.
         #expect(ManagedModel.diarization.languages.isEmpty)

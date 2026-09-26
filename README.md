@@ -105,12 +105,12 @@ no timestamps at all, and asking it for them (`<|timestamp|>`) makes its decoder
 degenerate into a repetition loop. Parakeet was removed once Apple's transcriber
 covered English better than it did.
 
-The language you declare for a recording decides the model, with one
-exception:
+The language you declare for a recording decides the model; where there are
+two worth comparing, the Transcribe sheet also asks which:
 
 | Language | Model | Why |
 |---|---|---|
-| English, German, Spanish, French, Italian, Portuguese | Apple | Nine times faster, and nothing for Konfer to download |
+| English, German, Spanish, French, Italian, Portuguese | **Apple**, or Whisper large-v3 if chosen | Nine times faster, and nothing for Konfer to download |
 | Swedish | KB-Whisper Large | Apple has no Swedish; this was trained for it |
 | Danish | **Røst v3**, or Whisper large-v3 if chosen | Trained for Danish; see below |
 | Dutch, Polish | Whisper large-v3 | None of the others can do them |
@@ -138,10 +138,12 @@ Konfer runs an 8-bit WhisperKit conversion of it
 ([kramerthomas/roest-v3-whisper-1.5b-coreml](https://huggingface.co/kramerthomas/roest-v3-whisper-1.5b-coreml),
 1.6 GB), pinned to a commit so a later push can't change it underneath a
 release. Those numbers are the unquantized model's, and it is one person's
-conversion — so Danish is the one language that offers a choice: the
-Transcribe sheet's Model picker has large-v3 beside Røst, remembers the last
-used, and Transcribe Again opens on the meeting's own model, so transcribing
-the same meeting with each is one switch. A meeting records the model that
+conversion — so Danish offers a choice: the Transcribe sheet's Model picker
+has large-v3 beside Røst, remembers the last used, and Transcribe Again opens
+on the meeting's own model, so transcribing the same meeting with each is one
+switch. Apple's six languages offer large-v3 the same way, for the same
+reason: Apple was only ever measured for speed against Whisper, never for
+accuracy, and accents, jargon or poor audio may favour Whisper. A meeting records the model that
 made it; older Danish meetings were large-v3's.
 
 Measured so far, on this Mac: the pinned download took 65 s and the first

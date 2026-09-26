@@ -41,8 +41,9 @@ struct TranscriptionSettingsTab: View {
                     + "KB-Whisper is the National Library of Sweden's Whisper "
                     + "model, trained on more than 50,000 hours of Swedish, and "
                     + "Røst the CoRal project's, trained on Danish; Dutch and "
-                    + "Polish go to OpenAI's multilingual Whisper. Danish can use "
-                    + "that too — choose it when you transcribe."
+                    + "Polish go to OpenAI's multilingual Whisper. Danish and "
+                    + "Apple's languages can use that too — choose it when you "
+                    + "transcribe."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

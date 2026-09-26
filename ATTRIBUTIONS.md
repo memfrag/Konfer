@@ -29,7 +29,7 @@ Two of them are worth calling out before the lists:
 | [Apple `SpeechTranscriber`](https://developer.apple.com/documentation/speech/speechtranscriber) | English, German, Spanish, French, Italian, Portuguese | Part of macOS | Apple Inc. |
 | [KB-Whisper Large](https://huggingface.co/KBLab/kb-whisper-large) | Swedish | Apache-2.0 | KBLab, National Library of Sweden |
 | [Røst v3](https://huggingface.co/CoRal-project/roest-v3-whisper-1.5b) | Danish | **Røst Model License** (AI Pubs Open RAIL-M, with use restrictions) | The CoRal project; licensed by Alvenir ApS |
-| [Whisper large-v3](https://huggingface.co/openai/whisper-large-v3) | Dutch, Polish, and Danish when chosen | Apache-2.0 | OpenAI |
+| [Whisper large-v3](https://huggingface.co/openai/whisper-large-v3) | Dutch, Polish, and Danish or Apple's languages when chosen | Apache-2.0 | OpenAI |
 | [pyannote speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) | Every transcription | **CC BY 4.0** | Hervé Bredin and the pyannote authors; speaker embedding by WeSpeaker; PLDA parameters by BUT Speech@FIT |
 
 Apple's models are installed by macOS itself, per locale, and are governed by

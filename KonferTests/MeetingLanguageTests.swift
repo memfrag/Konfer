@@ -107,11 +107,20 @@ struct MeetingLanguageTests {
         #expect(ASRBackendKind.choices(for: .danish) == [.roestWhisper, .whisperLargeV3])
     }
 
-    @Test("Every other language has exactly one model, so no choice to show")
-    func onlyDanishHasAChoice() {
-        for language in MeetingLanguage.allCases where language != .danish {
-            #expect(ASRBackendKind.choices(for: language) == [ASRBackendKind(transcribing: language)])
-        }
+    @Test(
+        "Apple's languages start on Apple, and offer stock Whisper as the alternative",
+        arguments: [MeetingLanguage.english, .german, .spanish, .french, .italian, .portuguese]
+    )
+    func appleLanguagesOfferWhisper(_ language: MeetingLanguage) {
+        #expect(ASRBackendKind.choices(for: language) == [.appleSpeech, .whisperLargeV3])
+    }
+
+    @Test(
+        "Swedish, Dutch and Polish have exactly one model, so no choice to show",
+        arguments: [MeetingLanguage.swedish, .dutch, .polish]
+    )
+    func someLanguagesHaveNoChoice(_ language: MeetingLanguage) {
+        #expect(ASRBackendKind.choices(for: language) == [ASRBackendKind(transcribing: language)])
     }
 
     @Test("Every model a language offers can actually transcribe it, the default first")
