@@ -19,9 +19,6 @@ import WhisperKit
 ///
 nonisolated enum WhisperKitModelStore {
 
-    /// WhisperKit's own model repository.
-    private static let repository = "argmaxinc/whisperkit-coreml"
-
     /// The compiled CoreML bundles every Whisper model folder has. Used only to
     /// tell a finished download from an interrupted one — the full file list is
     /// WhisperKit's business, not ours.
@@ -35,15 +32,46 @@ nonisolated enum WhisperKitModelStore {
 
     enum Variant: String, Sendable, CaseIterable {
 
-        /// OpenAI's Whisper large-v3. Multilingual, and the only model here
-        /// that can transcribe Danish, Dutch or Polish.
+        /// OpenAI's Whisper large-v3. Multilingual; Dutch and Polish, and
+        /// Danish when Røst isn't wanted.
         case largeV3 = "openai_whisper-large-v3"
+
+        /// Røst v3, the CoRal project's Danish fine-tune of large-v3, as an
+        /// 8-bit WhisperKit conversion. Same architecture and vocabulary as
+        /// large-v3, so the same tokenizer.
+        case roestV3 = "CoRal-project_roest-v3-whisper-1.5b_1624MB"
 
         var folderName: String { rawValue }
 
+        /// The Hugging Face repository the folder lives in.
+        var repository: String {
+            switch self {
+            case .largeV3: "argmaxinc/whisperkit-coreml"
+            case .roestV3: "kramerthomas/roest-v3-whisper-1.5b-coreml"
+            }
+        }
+
+        /// The commit to fetch, or nil for the repository's latest.
+        ///
+        /// Røst is pinned because it is one person's conversion: a later push
+        /// to that repository shouldn't change what Konfer transcribes with,
+        /// or what it has already told people they're downloading. Argmax's
+        /// own repository is the one WhisperKit itself tracks.
+        var revision: String? {
+            switch self {
+            case .largeV3: nil
+            case .roestV3: "3e9222be085107e7843c738c0078522644c5afeb"
+            }
+        }
+
         /// What the download costs, for a UI that has to say so before it
         /// starts. Approximate: the exact figure is only known afterwards.
-        var estimatedBytes: Int64 { 3_100_000_000 }
+        var estimatedBytes: Int64 {
+            switch self {
+            case .largeV3: 3_100_000_000
+            case .roestV3: 1_630_000_000
+            }
+        }
     }
 
     // MARK: - Location
@@ -54,7 +82,7 @@ nonisolated enum WhisperKitModelStore {
     /// layout moves our lookups with it instead of silently missing them.
     static func directory(for variant: Variant) -> URL {
         HubApiWrapper(downloadBase: KBWhisperModelStore.directory)
-            .localRepoLocation(HubApiWrapper.Repo(id: repository, type: .models))
+            .localRepoLocation(HubApiWrapper.Repo(id: variant.repository, type: .models))
             .appending(path: variant.folderName)
     }
 
@@ -78,10 +106,24 @@ nonisolated enum WhisperKitModelStore {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         do {
+            // WhisperKit's own download has no way to name a commit, so a
+            // pinned variant is fetched through the hub wrapper underneath it,
+            // which lands it in the same place.
+            if let revision = variant.revision {
+                let snapshot = try await HubApiWrapper(downloadBase: KBWhisperModelStore.directory)
+                    .snapshot(
+                        from: HubApiWrapper.Repo(id: variant.repository, type: .models),
+                        revision: revision,
+                        matching: ["\(variant.folderName)/*"]
+                    ) { fraction in
+                        progress(fraction.fractionCompleted)
+                    }
+                return snapshot.appending(path: variant.folderName)
+            }
             return try await WhisperKit.download(
                 variant: variant.folderName,
                 downloadBase: KBWhisperModelStore.directory,
-                from: repository
+                from: variant.repository
             ) { fraction in
                 progress(fraction.fractionCompleted)
             }

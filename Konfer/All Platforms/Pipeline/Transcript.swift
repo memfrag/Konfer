@@ -370,7 +370,18 @@ nonisolated struct Meeting: Identifiable, Codable, Hashable, Sendable {
     /// Optional so meetings written before translation existed still decode.
     var translation: TranscriptTranslation?
 
+    /// The speech model that produced the transcript. Optional so meetings
+    /// written before a language could have two still decode — see ``model``
+    /// for what those were made with.
+    var transcriptionModel: ASRBackendKind?
+
     var audioURL: URL { URL(fileURLWithPath: audioPath) }
+
+    /// The speech model that produced the transcript, recorded or — for a
+    /// meeting older than the record — the one its language used then.
+    var model: ASRBackendKind {
+        transcriptionModel ?? .assumed(forMeetingIn: language)
+    }
 
     /// Whether the source recording is still where we left it. Checked when a
     /// meeting is opened rather than swept at launch.

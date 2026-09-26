@@ -23,6 +23,7 @@ actor BackendRegistry {
         case .kbWhisperSmall: WhisperKitBackend(source: .kbWhisper(.small))
         case .kbWhisperLarge: WhisperKitBackend(source: .kbWhisper(.large))
         case .whisperLargeV3: WhisperKitBackend(source: .whisperKit(.largeV3))
+        case .roestWhisper: WhisperKitBackend(source: .whisperKit(.roestV3))
         }
         backends[kind] = backend
         return backend

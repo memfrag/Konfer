@@ -94,11 +94,56 @@ struct MeetingLanguageTests {
     }
 
     @Test(
-        "The languages nothing else covers go to stock Whisper",
-        arguments: [MeetingLanguage.danish, .dutch, .polish]
+        "Dutch and Polish, which nothing else covers, go to stock Whisper",
+        arguments: [MeetingLanguage.dutch, .polish]
     )
     func unservedLanguagesUseWhisperLargeV3(_ language: MeetingLanguage) {
         #expect(ASRBackendKind(transcribing: language) == .whisperLargeV3)
+    }
+
+    @Test("Danish goes to Røst, and offers stock Whisper as the alternative")
+    func danishOffersBothModels() {
+        #expect(ASRBackendKind(transcribing: .danish) == .roestWhisper)
+        #expect(ASRBackendKind.choices(for: .danish) == [.roestWhisper, .whisperLargeV3])
+    }
+
+    @Test("Every other language has exactly one model, so no choice to show")
+    func onlyDanishHasAChoice() {
+        for language in MeetingLanguage.allCases where language != .danish {
+            #expect(ASRBackendKind.choices(for: language) == [ASRBackendKind(transcribing: language)])
+        }
+    }
+
+    @Test("Every model a language offers can actually transcribe it, the default first")
+    func everyChoiceIsWorkable() {
+        for language in MeetingLanguage.allCases {
+            let choices = ASRBackendKind.choices(for: language)
+            #expect(choices.first == ASRBackendKind(transcribing: language))
+            #expect(choices.allSatisfy { $0.supports(language) })
+        }
+    }
+
+    @Test("Røst is offered for Danish and nothing else")
+    func roestIsDanishOnly() {
+        for language in MeetingLanguage.allCases {
+            #expect(ASRBackendKind.roestWhisper.supports(language) == (language == .danish))
+        }
+    }
+
+    @Test("A Danish meeting from before models were recorded counts as stock Whisper, which made it")
+    func olderDanishMeetingsWereLargeV3() throws {
+        let older = try decoded(try encoded(meeting(language: .danish)))
+
+        #expect(older.transcriptionModel == nil)
+        #expect(older.model == .whisperLargeV3)
+    }
+
+    @Test("A meeting's recorded model survives a round trip")
+    func recordedModelRoundTrips() throws {
+        var danish = meeting(language: .danish)
+        danish.transcriptionModel = .roestWhisper
+
+        #expect(try decoded(try encoded(danish)).model == .roestWhisper)
     }
 
     @Test("Apple is never handed a language it has no locale for")

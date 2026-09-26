@@ -22,15 +22,20 @@ import Foundation
 /// Swedish nor Danish, Dutch or Polish. Stock Whisper large-v3 covers those
 /// three; Swedish stays on KB-Whisper, which was trained for it.
 ///
-/// Which one runs is not a preference. Each row has one sensible reading, so
-/// the language decides and there is no model picker to get wrong:
+/// The language decides, with one exception. Each language has a default:
 ///
 /// - **Apple** for the six languages it already covers on this Mac. Nine times
 ///   faster, and nothing for Konfer to download or manage.
 /// - **KB-Whisper Large** for Swedish, which Apple does not support at all.
-/// - **Whisper large-v3** for Danish, Dutch and Polish, which neither of the
-///   other two can do — Apple's 30 locales include none of them, and KB-Whisper
-///   is a Swedish-only fine-tune.
+/// - **Røst v3** for Danish: the CoRal project's fine-tune of large-v3, which
+///   its authors measure at 11.6% character error on conversational Danish
+///   against large-v3's 27.5%.
+/// - **Whisper large-v3** for Dutch and Polish, which none of the others do.
+///
+/// The exception is Danish, which also offers large-v3 — see
+/// ``choices(for:)``. Røst is one person's quantized conversion and not yet
+/// measured here, and transcribing the same meeting with both is the way to
+/// find out whether it earns its place.
 ///
 public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable {
 
@@ -38,29 +43,52 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
     case whisperLargeV3 = "whisper-large-v3"
     case kbWhisperSmall = "kb-whisper-small"
     case kbWhisperLarge = "kb-whisper-large"
+    case roestWhisper = "roest-whisper"
 
-    /// The model that transcribes a given language.
+    /// The model a language uses unless another is chosen.
     public init(transcribing language: MeetingLanguage) {
         switch language {
         case .english, .german, .spanish, .french, .italian, .portuguese:
             self = .appleSpeech
         case .swedish:
             self = .kbWhisperLarge
-        case .danish, .dutch, .polish:
+        case .danish:
+            self = .roestWhisper
+        case .dutch, .polish:
             self = .whisperLargeV3
         }
     }
 
+    /// The models a language can be transcribed with, the default first.
+    /// Only a language with more than one gets a choice in the Transcribe
+    /// sheet.
+    public static func choices(for language: MeetingLanguage) -> [ASRBackendKind] {
+        switch language {
+        case .danish: [.roestWhisper, .whisperLargeV3]
+        default: [ASRBackendKind(transcribing: language)]
+        }
+    }
+
+    /// The model a meeting was transcribed with when it didn't record one.
+    ///
+    /// Meetings only began recording their model when Danish got a second
+    /// one, so an older meeting's model is whatever its language used then —
+    /// for Danish, large-v3, not today's default.
+    public static func assumed(forMeetingIn language: MeetingLanguage) -> ASRBackendKind {
+        language == .danish ? .whisperLargeV3 : ASRBackendKind(transcribing: language)
+    }
+
     /// Whether this model can transcribe a language at all.
     ///
-    /// Unreachable through the app, where the language picks the model. It
-    /// guards the `KONFER_BACKEND` override, which can name a model that has
-    /// no business with the recording's language: the run then fails
-    /// immediately rather than after diarization has spent a minute on it.
+    /// The app only offers a language's ``choices(for:)``. This guards the
+    /// `KONFER_BACKEND` override, which can name a model that has no business
+    /// with the recording's language: the run then fails immediately rather
+    /// than after diarization has spent a minute on it.
     public func supports(_ language: MeetingLanguage) -> Bool {
         switch self {
         case .appleSpeech: ASRBackendKind(transcribing: language) == .appleSpeech
         case .kbWhisperSmall, .kbWhisperLarge: language == .swedish
+        case .roestWhisper: language == .danish
         case .whisperLargeV3: true
         }
     }
@@ -71,6 +99,7 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
         case .whisperLargeV3: "Whisper Large v3 — multilingual"
         case .kbWhisperSmall: "KB-Whisper Small — balanced"
         case .kbWhisperLarge: "KB-Whisper Large — most accurate"
+        case .roestWhisper: "Røst v3 — Danish"
         }
     }
 
@@ -86,6 +115,10 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
             "About 40× real time, 485 MB. Much better Swedish than Parakeet."
         case .kbWhisperLarge:
             "About 7× real time, 2.9 GB. The best Swedish available on-device."
+        case .roestWhisper:
+            "The CoRal project's Danish fine-tune of Whisper large-v3, 1.6 GB. "
+            + "Its authors measure less than half large-v3's errors on "
+            + "conversational Danish."
         }
     }
 
@@ -94,7 +127,9 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
         switch self {
         case .appleSpeech: 1
         case .kbWhisperSmall: 2
-        case .kbWhisperLarge, .whisperLargeV3: 9
+        // Røst is large-v3's size at 8 bits, and not yet timed here; assumed
+        // no slower than large-v3 until it is.
+        case .kbWhisperLarge, .whisperLargeV3, .roestWhisper: 9
         }
     }
 }

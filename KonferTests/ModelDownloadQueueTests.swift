@@ -77,17 +77,26 @@ struct ModelDownloadQueueTests {
     }
 
     @Test(
-        "Danish, Dutch and Polish need stock Whisper",
-        arguments: [MeetingLanguage.danish, .dutch, .polish]
+        "Dutch and Polish need stock Whisper",
+        arguments: [MeetingLanguage.dutch, .polish]
     )
     func unservedLanguagesNeedWhisperLargeV3(_ language: MeetingLanguage) {
         #expect(ManagedModel(transcribing: language) == .whisperLargeV3)
     }
 
-    @Test("A model lists exactly the languages that route to it")
+    @Test("Danish needs Røst by default, and stock Whisper only when it is chosen")
+    func danishNeedsTheChosenModel() {
+        #expect(ManagedModel(transcribing: .danish) == .roestWhisper)
+        #expect(ManagedModel(for: .whisperLargeV3) == .whisperLargeV3)
+        #expect(ManagedModel(for: .appleSpeech) == nil)
+    }
+
+    @Test("A model lists every language that can use it, chosen or by default")
     func modelsListTheirLanguages() {
         #expect(ManagedModel.kbWhisperLarge.languages == [.swedish])
+        // Danish is on it too: deleting it takes Danish's second choice away.
         #expect(ManagedModel.whisperLargeV3.languages == [.danish, .dutch, .polish])
+        #expect(ManagedModel.roestWhisper.languages == [.danish])
         // Every language needs it, so naming any subset would mislead.
         #expect(ManagedModel.diarization.languages.isEmpty)
     }

@@ -143,14 +143,17 @@ final class TranscriptionPipeline {
         title: String? = nil,
         separatesSources: Bool = false,
         suppressesBleed: Bool = false,
-        folder: MeetingFolder = .root
+        folder: MeetingFolder = .root,
+        model: ASRBackendKind? = nil
     ) {
         let job = Job(
             sourceURL: url,
             title: title ?? url.deletingPathExtension().lastPathComponent,
             language: language,
             expectedSpeakers: expectedSpeakers,
-            backend: Self.backendOverride ?? ASRBackendKind(transcribing: language),
+            // The override wins, for benchmarking; then the model chosen in
+            // the sheet; then the language's default.
+            backend: Self.backendOverride ?? model ?? ASRBackendKind(transcribing: language),
             fastTranscription: fastTranscription,
             trim: trim,
             separatesSources: separatesSources,
@@ -219,8 +222,10 @@ final class TranscriptionPipeline {
             //    first — see `ImportSheet` — so reaching here means another
             //    caller slipped past. `KONFER_BACKEND` is exempt: benchmarking
             //    keeps the old lazy download.
+            //    The model that will actually run, which for Danish may not be
+            //    the language's default.
             if Self.backendOverride == nil,
-               let required = ManagedModel(transcribing: job.language),
+               let required = ManagedModel(for: job.backend),
                !required.isInstalled {
                 throw PipelineError.modelNotDownloaded(required)
             }
@@ -335,6 +340,9 @@ final class TranscriptionPipeline {
                 existing.hasSeparateSources = job.separatesSources ? true : nil
                 existing.suppressedBleed = job.suppressesBleed ? true : nil
                 existing.duration = audio.sourceDuration
+                // Which may differ from the first run's: transcribing the same
+                // Danish meeting with the other model is how they are compared.
+                existing.transcriptionModel = job.backend
 
                 // The language the re-run was told to use, which may not be
                 // the one the first run used. Without this a meeting
@@ -367,7 +375,8 @@ final class TranscriptionPipeline {
                     keptRange: nil,
                     wasFastTranscribed: job.fastTranscription ? true : nil,
                     hasSeparateSources: job.separatesSources ? true : nil,
-                    suppressedBleed: job.suppressesBleed ? true : nil
+                    suppressedBleed: job.suppressesBleed ? true : nil,
+                    transcriptionModel: job.backend
                 )
                 // Into the top level if the folder went while this ran; see
                 // `MeetingStore.add(_:in:)`.
