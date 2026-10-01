@@ -25,7 +25,9 @@ final class PlayerController {
         unload()
         guard FileManager.default.fileExists(atPath: url.path) else { return }
 
-        let player = AVPlayer(url: url)
+        // `AVPlayer` sniffs most misnamed files on its own, but not an M4A
+        // named `.mp3`; the same link the pipeline reads plays every one.
+        let player = AVPlayer(url: AudioFileName.readable(url))
         self.player = player
         isLoaded = true
 

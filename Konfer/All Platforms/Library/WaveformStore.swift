@@ -88,7 +88,7 @@ nonisolated enum WaveformStore {
     /// build against 0.3 in a release one. Accelerate is precompiled, so it is
     /// fast either way — and it is a debug build people run while developing.
     private static func computeWaveform(at url: URL) throws -> Waveform {
-        let file = try AVAudioFile(forReading: url)
+        let file = try AVAudioFile(forReading: AudioFileName.readable(url))
         let format = file.processingFormat
         let totalFrames = file.length
         guard totalFrames > 0 else { return Waveform(peaks: []) }

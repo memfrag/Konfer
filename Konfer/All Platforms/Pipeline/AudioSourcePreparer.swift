@@ -9,9 +9,10 @@ import Foundation
 /// The audio file handed to FluidAudio, plus how to clean up after it.
 nonisolated struct PreparedAudio: Sendable {
 
-    /// The file the pipeline should read. Either the user's own file or a
-    /// temporary one derived from it: audio extracted from video, a trim, or
-    /// the channels folded into one.
+    /// The file the pipeline should read. Either the user's own file — or a
+    /// link to it, when its name gets its format wrong — or a temporary one
+    /// derived from it: audio extracted from video, a trim, or the channels
+    /// folded into one.
     let url: URL
 
     /// Length of `url` — the trimmed extract when there is one, so the stages
@@ -88,7 +89,10 @@ nonisolated enum AudioSourcePreparer {
         suppressingBleed: Bool = false
     ) async throws -> PreparedAudio {
 
-        let asset = AVURLAsset(url: url)
+        // A recording named for the wrong format is read through a link named
+        // for the right one. Errors still name `url`, the file the user chose.
+        let readable = AudioFileName.readable(url)
+        let asset = AVURLAsset(url: readable)
 
         let sourceDuration: TimeInterval
         do {
@@ -109,7 +113,7 @@ nonisolated enum AudioSourcePreparer {
 
         let hasVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
 
-        var working = url
+        var working = readable
         var temporary: URL?
         var pendingRange = range
 
@@ -117,7 +121,7 @@ nonisolated enum AudioSourcePreparer {
         // through an export session; anything else is trimmed in the pass that
         // folds it, which is both exact to the sample and free of the AAC
         // round trip an export would put in the way of two unrelated sources.
-        if hasVideo || (range != nil && (try? AVAudioFile(forReading: url)) == nil) {
+        if hasVideo || (range != nil && (try? AVAudioFile(forReading: readable)) == nil) {
             guard try await !asset.loadTracks(withMediaType: .audio).isEmpty else {
                 throw PipelineError.noAudioTrack(url)
             }

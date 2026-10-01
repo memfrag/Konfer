@@ -49,7 +49,8 @@ TEST_RUNNER_KONFER_AUDIO=/path/to/meeting.wav \
 `PipelineIntegrationTests` also reads `KONFER_BACKEND`, `KONFER_LANGUAGE`,
 `KONFER_FAST`, `KONFER_SIDES=1` (treat the file as a Konfer recording with the
 microphone and system audio on separate channels), `KONFER_BLEED=1` (silence the
-microphone where it is only hearing the call) and `KONFER_LIBRARY=real`; `RecordingSourceTests` needs
+microphone where it is only hearing the call), `KONFER_TRIM=60-180` (transcribe
+only that stretch, in seconds) and `KONFER_LIBRARY=real`; `RecordingSourceTests` needs
 `KONFER_RECORD_APP`; `TranslationAvailabilityTests` needs
 `KONFER_TRANSLATION=real` and Apple's language packs — it is the one suite that
 checks the recorded pair table against what macOS actually reports. Keep test

@@ -604,7 +604,7 @@ struct MeetingPane: View {
     /// because nothing is being transcribed: a video's audio track doesn't
     /// need extracting to a temporary file for `AVPlayer` to play it.
     private func attachAudio(at url: URL) async {
-        let duration = try? await AVURLAsset(url: url).load(.duration).seconds
+        let duration = try? await AVURLAsset(url: AudioFileName.readable(url)).load(.duration).seconds
 
         meetingStore.modify(meetingID) { $0.attachAudio(at: url, duration: duration) }
 

@@ -357,7 +357,7 @@ struct ImportSheet: View {
     // MARK: - Loading
 
     private func load() async {
-        let asset = AVURLAsset(url: url)
+        let asset = AVURLAsset(url: AudioFileName.readable(url))
         let length = (try? await asset.load(.duration).seconds) ?? 0
         duration = length.isFinite ? length : 0
 

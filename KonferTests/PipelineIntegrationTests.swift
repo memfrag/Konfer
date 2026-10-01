@@ -65,6 +65,16 @@ struct PipelineIntegrationTests {
         ProcessInfo.processInfo.environment["KONFER_BLEED"] == "1"
     }
 
+    /// `KONFER_TRIM=60-180` transcribes only that stretch, in seconds — what
+    /// the import sheet's handles do. A minute or two shows whether a file
+    /// gets through the pipeline at all without waiting for the whole of it.
+    nonisolated static var trim: KeptRange? {
+        guard let value = ProcessInfo.processInfo.environment["KONFER_TRIM"] else { return nil }
+        let bounds = value.split(separator: "-").compactMap { TimeInterval($0) }
+        guard bounds.count == 2, bounds[0] < bounds[1] else { return nil }
+        return KeptRange(start: bounds[0], end: bounds[1])
+    }
+
     @Test(
         "Transcribes a real recording into speaker-attributed turns",
         .enabled(if: PipelineIntegrationTests.audioURL != nil),
@@ -106,6 +116,7 @@ struct PipelineIntegrationTests {
         pipeline.enqueue(
             url,
             language: Self.language,
+            trim: Self.trim,
             separatesSources: Self.separatesSources,
             suppressesBleed: Self.suppressesBleed
         )
