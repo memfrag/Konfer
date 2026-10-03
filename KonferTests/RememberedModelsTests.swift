@@ -26,6 +26,15 @@ struct RememberedModelsTests {
         #expect(RememberedModels(memory.stored).model(for: .english) == .whisperLargeV3)
     }
 
+    @Test("Pianissimo chosen for Swedish is what Swedish starts on next time, across a save")
+    func remembersPianissimoForSwedish() {
+        var memory = RememberedModels("")
+        memory.remember(.pianissimo, for: .swedish)
+
+        #expect(RememberedModels(memory.stored).model(for: .swedish) == .pianissimo)
+        #expect(RememberedModels(memory.stored).model(for: .english) == .appleSpeech)
+    }
+
     @Test("A model a language doesn't offer is never remembered for it")
     func refusesModelsTheLanguageLacks() {
         var memory = RememberedModels("")

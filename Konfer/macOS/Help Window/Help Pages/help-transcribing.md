@@ -9,10 +9,10 @@ Drop an audio or video file, or a voice memo, onto the Konfer window. You can al
 | Language | Model |
 |---|---|
 | English, German, Spanish, French, Italian, Portuguese | Apple Speech, or Whisper Large v3 |
-| Swedish | KB-Whisper Large |
+| Swedish | KB-Whisper Large, or Pianissimo |
 | Danish, Dutch, Polish | Whisper Large v3 |
 
-**Model.** This appears only for the languages that have a choice, and Konfer remembers your choice for each language. Apple Speech is about nine times faster and needs no download. Whisper is worth a try when Apple struggles with accents, jargon or poor audio.
+**Model.** This appears only for the languages that have a choice, and Konfer remembers your choice for each language. Apple Speech is about nine times faster and needs no download. Whisper is worth a try when Apple struggles with accents, jargon or poor audio. For Swedish, KB-Whisper Large is the most accurate. Klang AI's Pianissimo is sixteen times faster, transcribing an hour in under a minute, but it has been tested less: transcribe a meeting you know with both to see which suits you.
 
 If the model isn't downloaded yet, the sheet says how big it is and offers **Download…**. **Transcribe** stays unavailable until the model is there. See [Models and Storage](konfer-help:models).
 

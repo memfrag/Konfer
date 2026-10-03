@@ -113,11 +113,15 @@ final class ModelDownloadQueue {
     /// Queues everything the given languages need, plus diarization, which
     /// every transcription uses whatever the language.
     ///
-    /// Languages Apple covers contribute nothing — which is itself the useful
-    /// signal on the first-run screen.
-    func enqueueEverythingNeeded(for languages: [MeetingLanguage]) {
+    /// Each language contributes the model it is set to in `models` — its
+    /// default unless the first-run screen chose otherwise. Apple's model
+    /// contributes nothing, which is itself the useful signal on that screen.
+    func enqueueEverythingNeeded(
+        for languages: [MeetingLanguage],
+        models: RememberedModels = RememberedModels("")
+    ) {
         enqueue(.diarization)
-        for model in languages.compactMap(ManagedModel.init(transcribing:)) {
+        for model in languages.compactMap({ ManagedModel(for: models.model(for: $0)) }) {
             enqueue(model)
         }
     }

@@ -151,11 +151,11 @@ struct ImportSheet: View {
                     + "built-in recognition where it has the language, "
                     + "KB-Whisper for Swedish, and OpenAI's Whisper for "
                     + "Danish, Dutch and Polish. Apple's languages can use "
-                    + "OpenAI's Whisper instead."
+                    + "OpenAI's Whisper instead, and Swedish can use Pianissimo."
                 )
 
-                // Only where there is something to choose — Apple's six.
-                // Everywhere else the language has settled it.
+                // Only where there is something to choose — Apple's six and
+                // Swedish. Everywhere else the language has settled it.
                 if modelChoices.count > 1 {
                     Picker("Model:", selection: Binding(
                         get: { chosenModel },
@@ -409,20 +409,8 @@ struct ImportSheet: View {
         modelChoices.contains(model) ? model : RememberedModels(rememberedModels).model(for: language)
     }
 
-    /// Why one might pick either, in a line. What large-v3 is the
-    /// alternative *to* depends on the language, so the caption does too.
     private var modelCaption: String {
-        switch (chosenModel, ASRBackendKind(transcribing: language)) {
-        case (.appleSpeech, _):
-            "Apple's built-in recognition. About nine times faster than "
-            + "Whisper, and nothing to download."
-        case (.whisperLargeV3, .appleSpeech):
-            "OpenAI's multilingual Whisper. About nine times slower than Apple's "
-            + "and a 3 GB download, but worth trying where Apple struggles — "
-            + "accents, jargon, poor audio."
-        default:
-            model.summary
-        }
+        chosenModel.caption(in: language)
     }
 
     /// Says which model is missing and how big it is, rather than letting the

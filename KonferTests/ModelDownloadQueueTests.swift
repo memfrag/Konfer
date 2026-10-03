@@ -87,6 +87,7 @@ struct ModelDownloadQueueTests {
     @Test("A chosen model needs its own download, and Apple's and Røst's need none")
     func chosenModelsNeedTheirOwnDownload() {
         #expect(ManagedModel(for: .whisperLargeV3) == .whisperLargeV3)
+        #expect(ManagedModel(for: .pianissimo) == .pianissimo)
         #expect(ManagedModel(for: .appleSpeech) == nil)
         // Removed, so there is nothing to fetch — and nothing to list.
         #expect(ManagedModel(for: .roestWhisper) == nil)
@@ -95,6 +96,7 @@ struct ModelDownloadQueueTests {
     @Test("A model lists every language that can use it, chosen or by default")
     func modelsListTheirLanguages() {
         #expect(ManagedModel.kbWhisperLarge.languages == [.swedish])
+        #expect(ManagedModel.pianissimo.languages == [.swedish])
         // Every language that can choose it is on it too: deleting it takes
         // their second choice away.
         #expect(Set(ManagedModel.whisperLargeV3.languages) == [
@@ -259,6 +261,36 @@ struct ModelDownloadQueueTests {
         let queue = ModelDownloadQueue(fetcher: stub.fetcher())
 
         queue.enqueueEverythingNeeded(for: [.english, .polish])
+        await drain(queue)
+
+        #expect(stub.downloaded == [.diarization, .whisperLargeV3])
+    }
+
+    @Test("Swedish queues KB-Whisper Large unless Pianissimo was chosen for it")
+    func swedishQueuesItsChosenModel() async {
+        let stub = Stub()
+        let queue = ModelDownloadQueue(fetcher: stub.fetcher())
+        queue.enqueueEverythingNeeded(for: [.swedish])
+        await drain(queue)
+        #expect(stub.downloaded == [.diarization, .kbWhisperLarge])
+
+        let chosen = Stub()
+        let chosenQueue = ModelDownloadQueue(fetcher: chosen.fetcher())
+        var models = RememberedModels("")
+        models.remember(.pianissimo, for: .swedish)
+        chosenQueue.enqueueEverythingNeeded(for: [.swedish], models: models)
+        await drain(chosenQueue)
+        #expect(chosen.downloaded == [.diarization, .pianissimo])
+    }
+
+    @Test("Choosing Whisper for English on the first-run screen queues it")
+    func chosenWhisperForEnglishIsQueued() async {
+        let stub = Stub()
+        let queue = ModelDownloadQueue(fetcher: stub.fetcher())
+        var models = RememberedModels("")
+        models.remember(.whisperLargeV3, for: .english)
+
+        queue.enqueueEverythingNeeded(for: [.english, .german], models: models)
         await drain(queue)
 
         #expect(stub.downloaded == [.diarization, .whisperLargeV3])

@@ -7,7 +7,7 @@ import SwiftUI
 /// Which model transcribes, and what that costs.
 ///
 /// There is nothing to choose here: the language of a recording decides its
-/// model. It is still worth showing rather than hiding, because the two differ
+/// default model, and any alternative is picked when transcribing. It is still worth showing rather than hiding, because the two differ
 /// by a factor of nine in speed and by 2.9 GB on disk, and a user who knows
 /// that can read the progress bar rather than wonder about it.
 struct TranscriptionSettingsTab: View {
@@ -41,8 +41,9 @@ struct TranscriptionSettingsTab: View {
                     + "KB-Whisper is the National Library of Sweden's Whisper "
                     + "model, trained on more than 50,000 hours of Swedish; "
                     + "Danish, Dutch and Polish go to OpenAI's multilingual "
-                    + "Whisper. Apple's languages can use that too — choose it "
-                    + "when you transcribe."
+                    + "Whisper. Apple's languages can use that too, and Swedish "
+                    + "can use Klang AI's Pianissimo, sixteen times faster than "
+                    + "KB-Whisper — choose either when you transcribe."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

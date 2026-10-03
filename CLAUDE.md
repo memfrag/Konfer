@@ -57,9 +57,7 @@ parallelization off — two runner processes sharing one model cache corrupt eac
 other's download.
 
 Runtime overrides for experiments: `KONFER_BACKEND` (forces a model, including
-the otherwise unreachable `kb-whisper-small` and `pianissimo-sv` — the latter
-downloads Konfer's own conversion from a GitHub release; see
-`scripts/pianissimo-coreml/README.md`), `KONFER_CHUNKING=vad`,
+the otherwise unreachable `kb-whisper-small`), `KONFER_CHUNKING=vad`,
 `KONFER_SLICES=1`,
 `KONFER_WHISPER_VERBOSE=1`, `KONFER_VAD_PADDING`, `KONFER_RECORD_DIAGNOSTICS=1`,
 `KONFER_BLEED_DIAGNOSTICS=1` (what the bleed measurement found and how much of
@@ -152,9 +150,18 @@ channels, one transcript".
 gives each of the ten `MeetingLanguage` cases a default — Apple for the six
 locales it covers, KB-Whisper Large for Swedish, stock Whisper large-v3 for
 Danish, Dutch and Polish. `ASRBackendKind.choices(for:)` lists what a language
-may use instead: Apple's six languages offer large-v3 beside Apple; the other
-four have one model. Only where there are two does `ImportSheet` show a Model
-picker, remembered per language in `RememberedModels`. There is no model
+may use instead: Apple's six languages offer large-v3 beside Apple, Swedish
+offers Pianissimo beside KB-Whisper; the other three have one model. Only
+where there are two do `ImportSheet` and the first-run `WelcomeView` show a
+Model picker, remembered per language in `RememberedModels`.
+
+Pianissimo (`ParakeetBackend`) does not go through FluidAudio's ASR, whose
+15-second window is fixed at compile time: it runs Konfer's own 120-second
+CoreML conversion with its own windowing and greedy TDT loop, and downloads it
+from a GitHub release pinned by tag and SHA-256 (`PianissimoModelStore`).
+`scripts/pianissimo-coreml/` makes and publishes that release; a release is
+never marked latest, because `build-and-notarize.sh` reads the latest release
+as the app's version. There is no model
 setting and no automatic case in either enum: the user declares the language
 (defaulting to English) and, for Apple's languages, may pick the model. A
 `Meeting` records the model that made it (`transcriptionModel`); older
@@ -181,14 +188,15 @@ region. That is why the whole `TranscriptionBackend` protocol is
 language-parameterised.
 
 **Models are downloaded on purpose.** `ManagedModel` is the catalogue of what
-Konfer fetches itself (diarization, KB-Whisper Large, Whisper large-v3),
-wrapping three different mechanisms: FluidAudio's loader,
+Konfer fetches itself (diarization, KB-Whisper Large, Whisper large-v3,
+Pianissimo), wrapping four different mechanisms: FluidAudio's loader,
 `KBWhisperModelStore` (a hand-rolled fetch of a hardcoded file list, because
-KBLab's repo is not in WhisperKit's layout) and `WhisperKitModelStore`
+KBLab's repo is not in WhisperKit's layout), `WhisperKitModelStore`
 (WhisperKit's own downloader, for `argmaxinc/whisperkit-coreml`, whose folders
-carry files that list lacks).
-Both stores write under one directory so Settings ▸ Models measures and deletes
-in one place. `ModelDownloadQueue` runs them one at a time and lives in
+carry files that list lacks) and `PianissimoModelStore` (one zip from a GitHub
+release, checked and unpacked with Zipcode).
+The three stores write under one directory so Settings ▸ Models measures and
+deletes in one place. `ModelDownloadQueue` runs them one at a time and lives in
 `AppEnvironment` because `WelcomeWindow`, `ModelDownloadsWindow` and Settings
 all drive the same queue; its fetching is injected (`Fetcher`) so the state
 machine is testable without downloading gigabytes. `ImportSheet` disables

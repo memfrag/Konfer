@@ -142,8 +142,28 @@ enum OpenSourceAttributions {
                 + "licensed. "
                 + "See https://huggingface.co/openai/whisper-large-v3"
         )),
+        ("Pianissimo model", pianissimo),
         ("pyannote speaker diarization models", diarization)
     ]
+
+    // CC BY requires the credit, a link to the licence, and a statement of
+    // what was changed — the same three things the release notes carry.
+    private static let pianissimo = OpenSourceLicense(
+        name: "Creative Commons Attribution 4.0 International",
+        spdxID: "CC-BY-4.0",
+        text: [
+            "Klang Pianissimo, a Swedish speech recognition model by Klang AI "
+                + "AB, fine-tuned from NVIDIA Parakeet TDT 0.6B v3. Used under "
+                + "the Creative Commons Attribution 4.0 International license, "
+                + "https://creativecommons.org/licenses/by/4.0/ . "
+                + "See https://huggingface.co/KlangAI/pianissimo-sv",
+            "Konfer downloads a modified version: its own Core ML conversion, "
+                + "with the encoder's weights quantized to 8 bits and its local "
+                + "attention expressed as a band mask over full attention, "
+                + "published under the same licence at "
+                + "https://github.com/memfrag/Konfer/releases/tag/pianissimo-sv-120s-1",
+        ]
+    )
 
     // CC BY requires this credit rather than merely inviting it. Worded
     // after the conversion's NOTICE.md, which asks for all four parties,

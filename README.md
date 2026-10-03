@@ -15,8 +15,9 @@ Three stages:
 2. **Speech recognition** — Apple's `SpeechTranscriber` where it has the
    language, [KB-Whisper](https://huggingface.co/KBLab/kb-whisper-large) for
    Swedish and stock Whisper large-v3 for the rest, both via
-   [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift). All produce
-   per-word timings.
+   [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift), or for Swedish
+   on request [Pianissimo](https://huggingface.co/KlangAI/pianissimo-sv) in
+   Konfer's own CoreML conversion. All produce per-word timings.
 3. **The merge** — `SpeakerAligner` attributes each word to the speaker segment
    it overlaps most, then groups words into turns. Nothing off the shelf joins
    these two halves; this is the part Konfer adds.
@@ -99,11 +100,29 @@ Measured on the same five minutes of a real Swedish meeting (M3 Ultra):
 | Canary-1B-v2 *(rejected)* | 567 MB | 15× | "Ställs det så att de blir. Ställ omsättning." |
 | KB-Whisper small | 485 MB | 43× | "Theresas roll i snackomsättning, kreativiteten, lönsamhet…" |
 | **KB-Whisper large** | 2.9 GB | 7.5× | **"Resans roll i att öka omsättning, öka effektiviteten och lönsamheten."** ✓ |
+| Pianissimo, Konfer's conversion | 630 MB | 34× | "Resans roll i ökad omsättning, öka effektiviteten och lönsamheten." |
 
 Canary was rejected despite a better benchmark WER: FluidAudio's build returns
 no timestamps at all, and asking it for them (`<|timestamp|>`) makes its decoder
 degenerate into a repetition loop. Parakeet was removed once Apple's transcriber
 covered English better than it did.
+
+### Swedish: Pianissimo, offered beside KB-Whisper
+
+[Pianissimo](https://huggingface.co/KlangAI/pianissimo-sv) is Klang AI's
+Swedish fine-tune of that same Parakeet, trained on 50,000 hours of Swedish.
+Klang ships no CoreML build, and the community ones all use FluidAudio's
+15-second window, which on a real meeting lost whole phrases. Konfer converts
+it itself at 120 seconds (`scripts/pianissimo-coreml/`, which records the
+measurements and the traps) and publishes the result as a GitHub release.
+
+On the whole 1 h 17 m meeting below it transcribed in 37 s, against
+KB-Whisper Large's 10 to 16 minutes, and its words differ from Klang's own
+fp32 build by 2.6%. Its authors' benchmark puts it behind KB-Whisper Large on
+read speech (Common Voice 4.46% WER against 3.91%), and nobody has yet read
+its meeting transcripts against KB-Whisper's — so it is Swedish's second
+choice, not its default. The five-minute speed above includes loading the
+model; on an hour, it runs at about 125×.
 
 The language you declare for a recording decides the model; where there are
 two worth comparing, the Transcribe sheet also asks which:
@@ -111,7 +130,7 @@ two worth comparing, the Transcribe sheet also asks which:
 | Language | Model | Why |
 |---|---|---|
 | English, German, Spanish, French, Italian, Portuguese | **Apple**, or Whisper large-v3 if chosen | Nine times faster, and nothing for Konfer to download |
-| Swedish | KB-Whisper Large | Apple has no Swedish; this was trained for it |
+| Swedish | **KB-Whisper Large**, or Pianissimo if chosen | Apple has no Swedish; KB-Whisper was trained for it, Pianissimo is sixteen times faster |
 | Danish, Dutch, Polish | Whisper large-v3 | None of the others can do them; for Danish, see below |
 
 Apple's `SpeechTranscriber` covers 30 locales — run

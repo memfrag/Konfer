@@ -14,6 +14,7 @@ import Foundation
 /// | Apple Speech      | —       | fast  | not supported |
 /// | KB-Whisper small  | 485 MB  | 43×   | good          |
 /// | KB-Whisper large  | 2.9 GB  | 7.5×  | best          |
+/// | Pianissimo        | 630 MB  | 120×  | good, faster  |
 /// | Whisper large-v3  | ~3 GB   | 7.5×  | (not used)    |
 ///
 /// KB-Whisper is the National Library of Sweden's Whisper fine-tune, trained on
@@ -34,7 +35,9 @@ import Foundation
 /// Apple's six also offer large-v3 as an alternative — see ``choices(for:)`` —
 /// because Apple was never measured against Whisper on them — only for speed,
 /// nine times faster — and accents, jargon or poor audio may go the other way.
-/// Transcribing the same meeting with each is how to find out.
+/// Swedish offers Pianissimo beside KB-Whisper for the same reason in reverse:
+/// sixteen times faster, measured on one meeting, read against KB-Whisper by
+/// nobody yet. Transcribing the same meeting with each is how to find out.
 ///
 public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable {
 
@@ -43,10 +46,9 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
     case kbWhisperSmall = "kb-whisper-small"
     case kbWhisperLarge = "kb-whisper-large"
 
-    /// Pianissimo, Klang AI's Swedish fine-tune of Parakeet TDT v3, being
-    /// measured against KB-Whisper Large — see ``ParakeetBackend``. Reachable
-    /// only through `KONFER_BACKEND`, like KB-Whisper Small: nothing routes to
-    /// it and nothing offers it.
+    /// Pianissimo, Klang AI's Swedish fine-tune of Parakeet TDT v3, run from
+    /// Konfer's own 120-second conversion — see ``ParakeetBackend``. Swedish's
+    /// second choice: KB-Whisper Large stays the default.
     case pianissimo = "pianissimo-sv"
 
     /// Røst v3, the CoRal project's Danish fine-tune of large-v3, which 1.4
@@ -77,12 +79,15 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
     /// Only a language with more than one gets a choice in the Transcribe
     /// sheet.
     ///
-    /// Swedish, Danish, Dutch and Polish have none: KB-Whisper is the best
-    /// Swedish measured, and large-v3 is the only model here for the rest.
+    /// Apple's languages can have large-v3 instead, and Swedish Pianissimo.
+    /// Danish, Dutch and Polish have none: large-v3 is the only model here
+    /// that speaks them.
     public static func choices(for language: MeetingLanguage) -> [ASRBackendKind] {
         switch ASRBackendKind(transcribing: language) {
         case .appleSpeech:
             [.appleSpeech, .whisperLargeV3]
+        case .kbWhisperLarge:
+            [.kbWhisperLarge, .pianissimo]
         default:
             [ASRBackendKind(transcribing: language)]
         }
@@ -137,11 +142,37 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
         case .kbWhisperLarge:
             "About 7× real time, 2.9 GB. The best Swedish available on-device."
         case .pianissimo:
-            "Klang AI's Swedish fine-tune of Parakeet. About 120× real time, "
-            + "700 MB. Being measured against KB-Whisper Large."
+            "Klang AI's Swedish model. About 120× real time, 630 MB. Sixteen "
+            + "times faster than KB-Whisper Large, and less tested."
         case .roestWhisper:
             "A Danish fine-tune of Whisper that Konfer no longer uses: stock "
             + "Whisper large-v3 transcribed Danish better."
+        }
+    }
+
+    /// Why one might pick this model for a language, in a line, beside its
+    /// alternative. What large-v3 is the alternative *to* depends on the
+    /// language, so the caption does too. Shown under the Model picker, both
+    /// on the first-run screen and in the Transcribe sheet.
+    public func caption(in language: MeetingLanguage) -> String {
+        switch (self, ASRBackendKind(transcribing: language)) {
+        case (.appleSpeech, _):
+            "Apple's built-in recognition. About nine times faster than "
+            + "Whisper, and nothing to download."
+        case (.whisperLargeV3, .appleSpeech):
+            "OpenAI's multilingual Whisper. About nine times slower than Apple's "
+            + "and a 3 GB download, but worth trying where Apple struggles — "
+            + "accents, jargon, poor audio."
+        case (.kbWhisperLarge, _):
+            "The National Library of Sweden's Whisper, trained on 50,000 hours "
+            + "of Swedish. The most accurate Swedish here, at about seven times "
+            + "real time, and a 2.9 GB download."
+        case (.pianissimo, _):
+            "Klang AI's Swedish model. Sixteen times faster than KB-Whisper — an "
+            + "hour in under a minute — and a 630 MB download, but less tested: "
+            + "compare the two on a meeting you know."
+        default:
+            summary
         }
     }
 

@@ -8,6 +8,8 @@ Everything happens on your Mac. The recording, the transcript and the translatio
 
 The welcome window asks **Which languages do you record in?** Some languages are handled by speech recognition built into macOS, and others need a model Konfer downloads. Tick your languages and choose **Download**, and Konfer fetches whatever they need. **Skip** leaves it for later.
 
+A language that can use more than one model gets a menu below the list, such as **Swedish model:**, with a line on what each model costs. Whichever you pick is what gets downloaded, and what the Transcribe sheet starts on for that language. You can download the other one later and switch.
+
 <view tag="open-window" window="model-downloads" label="Open Model Downloads"/>
 
 ## Three ways in
@@ -18,7 +20,7 @@ The welcome window asks **Which languages do you record in?** Some languages are
 
 ## What happens next
 
-A transcription runs in the background, and the bottom of the sidebar shows its progress. Konfer first works out who spoke when, then what they said, and then puts the two together. With Apple's recognition an hour of audio takes a minute or two. With the downloaded models it takes about ten minutes.
+A transcription runs in the background, and the bottom of the sidebar shows its progress. Konfer first works out who spoke when, then what they said, and then puts the two together. With Apple's recognition or Pianissimo an hour of audio takes a minute or two. With the Whisper models it takes about ten minutes.
 
 When it's done, the meeting appears in the sidebar and opens. From there you can [read and play it back](konfer-help:reading), [fix what the machine got wrong](konfer-help:editing), [translate it](konfer-help:translation) and [export it](konfer-help:exporting).
 

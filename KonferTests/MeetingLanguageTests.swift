@@ -109,12 +109,24 @@ struct MeetingLanguageTests {
         #expect(ASRBackendKind.choices(for: language) == [.appleSpeech, .whisperLargeV3])
     }
 
+    @Test("Swedish starts on KB-Whisper Large, and offers Pianissimo as the alternative")
+    func swedishOffersPianissimo() {
+        #expect(ASRBackendKind.choices(for: .swedish) == [.kbWhisperLarge, .pianissimo])
+    }
+
     @Test(
-        "Swedish, Danish, Dutch and Polish have exactly one model, so no choice to show",
-        arguments: [MeetingLanguage.swedish, .danish, .dutch, .polish]
+        "Danish, Dutch and Polish have exactly one model, so no choice to show",
+        arguments: [MeetingLanguage.danish, .dutch, .polish]
     )
     func someLanguagesHaveNoChoice(_ language: MeetingLanguage) {
         #expect(ASRBackendKind.choices(for: language) == [ASRBackendKind(transcribing: language)])
+    }
+
+    @Test("Pianissimo transcribes Swedish and nothing else")
+    func pianissimoIsSwedishOnly() {
+        for language in MeetingLanguage.allCases {
+            #expect(ASRBackendKind.pianissimo.supports(language) == (language == .swedish))
+        }
     }
 
     @Test("Every model a language offers can actually transcribe it, the default first")
