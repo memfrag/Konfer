@@ -58,7 +58,8 @@ other's download.
 
 Runtime overrides for experiments: `KONFER_BACKEND` (forces a model, including
 the otherwise unreachable `kb-whisper-small` and `pianissimo-sv` — the latter
-needs `scripts/pianissimo-coreml/convert.sh --install` first, see its README), `KONFER_CHUNKING=vad`,
+downloads Konfer's own conversion from a GitHub release; see
+`scripts/pianissimo-coreml/README.md`), `KONFER_CHUNKING=vad`,
 `KONFER_SLICES=1`,
 `KONFER_WHISPER_VERBOSE=1`, `KONFER_VAD_PADDING`, `KONFER_RECORD_DIAGNOSTICS=1`,
 `KONFER_BLEED_DIAGNOSTICS=1` (what the bleed measurement found and how much of

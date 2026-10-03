@@ -13,6 +13,24 @@ exports, compiles, and with `--install` copies the result to
 first run and peaks at about 7 GB of memory. `--encoder-bits 16` keeps the encoder at fp16 (1.2 GB rather
 than about 700 MB).
 
+## Publishing a release
+
+Konfer downloads the conversion from its own GitHub releases, pinned in `PianissimoModelStore` by tag
+and SHA-256.
+
+```sh
+./scripts/pianissimo-coreml/package.sh --release 2            # zip, manifest, size and SHA-256
+./scripts/pianissimo-coreml/package.sh --release 2 --publish  # also creates the GitHub release
+```
+
+Then set `release` and `archiveSHA256` in `PianissimoModelStore.swift` to the printed values. A release
+is never marked latest, because `build-and-notarize.sh` reads the latest release as the app's last
+version. Each new conversion gets a new release number: replacing the asset under an existing tag
+would break the pinned checksum in every copy of Konfer already out there.
+
+`RELEASE_NOTES.md` becomes both the release's notes and the `README.md` inside the zip. It carries the
+attribution CC BY 4.0 requires.
+
 ## Why convert it ourselves
 
 Klang ships NeMo, ONNX and MLX. The community CoreML builds, such as

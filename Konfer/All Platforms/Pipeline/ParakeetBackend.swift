@@ -57,11 +57,12 @@ actor ParakeetBackend: TranscriptionBackend {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         guard models == nil else { return }
-        guard PianissimoModelStore.isInstalled else {
-            throw PipelineError.modelDownloadFailed(underlying: CocoaError(
-                .fileNoSuchFile,
-                userInfo: [NSFilePathErrorKey: PianissimoModelStore.directory.path]
-            ))
+        do {
+            try await PianissimoModelStore.download(progress: progress)
+        } catch let error as PipelineError {
+            throw error
+        } catch {
+            throw PipelineError.modelDownloadFailed(underlying: error)
         }
         do {
             models = try Models()
