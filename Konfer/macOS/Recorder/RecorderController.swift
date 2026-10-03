@@ -26,14 +26,20 @@ final class RecorderController {
 
     // MARK: - Choices
 
-    var microphoneID: String?
+    var microphoneID: String? {
+        didSet { if microphoneID != oldValue { previewChoices() } }
+    }
 
     /// Whether the microphone is recorded at all. The chosen device is kept
     /// either way, so switching the microphone off and on again does not lose
     /// it — and so `refreshDevices()` never has to guess what a nil id means.
-    var recordsMicrophone = true
+    var recordsMicrophone = true {
+        didSet { if recordsMicrophone != oldValue { previewChoices() } }
+    }
 
-    var systemAudio: SystemAudioSource = .none
+    var systemAudio: SystemAudioSource = .none {
+        didSet { if systemAudio != oldValue { previewChoices() } }
+    }
     var destinationFolder: URL
     var filename: String = RecorderController.defaultFilename()
 
@@ -45,7 +51,8 @@ final class RecorderController {
     private(set) var state: State = .idle
     private(set) var error: RecordingError?
 
-    /// Peak level per channel, 0...1, for the meters.
+    /// Peak level per channel, 0...1, for the meters — live from the moment
+    /// the window opens, not only once recording has started.
     private(set) var microphoneLevel: Float = 0
     private(set) var systemLevel: Float = 0
 
@@ -75,6 +82,13 @@ final class RecorderController {
     @ObservationIgnored private var source: (any RecordingSource)?
     @ObservationIgnored private var writer: TwoChannelWriter?
     @ObservationIgnored private var meterTask: Task<Void, Never>?
+
+    /// What feeds the meters while nothing is being recorded. See
+    /// ``previewChoices()``.
+    @ObservationIgnored private var previewSource: (any RecordingSource)?
+    @ObservationIgnored private var previewProbe: LevelProbe?
+    @ObservationIgnored private var previewTask: Task<Void, Never>?
+    @ObservationIgnored private var isPreviewing = false
     @ObservationIgnored private var outputURL: URL?
     @ObservationIgnored private var systemEverHadSignal = false
 
@@ -99,16 +113,26 @@ final class RecorderController {
     /// Changes are ignored while recording: the lists exist to choose a source,
     /// and re-deriving them mid-recording could move the selection out from
     /// under a tap that is already running.
+    ///
+    /// The meters run for as long, too: they are there to be checked before
+    /// committing to an hour, so they have to move before Record is pressed.
     func startWatchingDevices() {
         refreshDevices()
         applicationsMonitor.start { [weak self] in
             guard let self, state == .idle else { return }
             refreshDevices()
         }
+        isPreviewing = true
+        previewChoices()
+        startMetering()
     }
 
     func stopWatchingDevices() {
         applicationsMonitor.stop()
+        // The meter task is left running: it also watches a recording that
+        // outlives the window for silence, and costs nothing once idle.
+        isPreviewing = false
+        previewChoices()
     }
 
     func refreshDevices() {
@@ -177,19 +201,12 @@ final class RecorderController {
         systemHistory = []
         state = .preparing
 
-        let url = destinationFolder.appendingPathComponent(sanitisedFilename)
-        let configuration = RecordingConfiguration(
-            microphoneID: microphoneID,
-            recordsMicrophone: recordsMicrophone,
-            systemAudio: systemAudio,
-            outputURL: url
-        )
+        // The preview holds the same devices, and a second tap on the same
+        // app is not something to find out about mid-meeting.
+        await stopPreview()
 
-        let source: any RecordingSource = switch systemAudio {
-        case .app: AggregateDeviceRecorder()
-        case .everything: ScreenCaptureRecorder()
-        case .none: MicrophoneOnlyRecorder()
-        }
+        let url = destinationFolder.appendingPathComponent(sanitisedFilename)
+        let source = makeSource()
 
         do {
             let writer = try TwoChannelWriter(url: url)
@@ -203,22 +220,21 @@ final class RecorderController {
             self.writer = writer
             self.outputURL = url
             state = .recording(startedAt: Date())
-            startMetering()
         } catch let recordingError as RecordingError {
             error = recordingError
             state = .idle
             try? FileManager.default.removeItem(at: url)
+            previewChoices()
         } catch {
             self.error = .writeFailed(underlying: error)
             state = .idle
             try? FileManager.default.removeItem(at: url)
+            previewChoices()
         }
     }
 
     func stop() async {
         guard state.isRecording else { return }
-        meterTask?.cancel()
-        meterTask = nil
 
         await source?.stop()
         writer?.finish()
@@ -226,8 +242,7 @@ final class RecorderController {
         source = nil
         writer = nil
         state = .idle
-        microphoneLevel = 0
-        systemLevel = 0
+        previewChoices()
 
         finishedRecording = outputURL
         // Ready for the next one.
@@ -243,19 +258,91 @@ final class RecorderController {
         error = nil
     }
 
+    private var configuration: RecordingConfiguration {
+        RecordingConfiguration(
+            microphoneID: microphoneID,
+            recordsMicrophone: recordsMicrophone,
+            systemAudio: systemAudio
+        )
+    }
+
+    private func makeSource() -> any RecordingSource {
+        switch systemAudio {
+        case .app: AggregateDeviceRecorder()
+        case .everything: ScreenCaptureRecorder()
+        case .none: MicrophoneOnlyRecorder()
+        }
+    }
+
+    // MARK: - Preview
+
+    /// Points the meters at whatever is currently chosen, while not recording.
+    ///
+    /// The same ``RecordingSource`` the recording would use, delivering into a
+    /// ``LevelProbe`` instead of a file — a microphone opened on the side
+    /// could not show a tap macOS has quietly refused, which is the failure
+    /// most worth catching early. It also means the permissions are asked for
+    /// when a source is chosen rather than when Record is pressed.
+    ///
+    /// Each call queues behind the last, which tears its source down first, so
+    /// flicking through the pickers never leaves two taps on one app. A source
+    /// that can't start — an app that has stopped playing, a refused
+    /// permission — leaves its bar flat; the error is Record's to report.
+    private func previewChoices() {
+        let previous = previewTask
+        previous?.cancel()
+        previewTask = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            await tearDownPreview()
+            guard !Task.isCancelled, isPreviewing, state == .idle, !hasNothingToRecord else {
+                return
+            }
+            let source = makeSource()
+            let probe = LevelProbe()
+            do {
+                try await source.prepare(configuration)
+                try await source.start(writingTo: probe)
+            } catch {
+                await source.stop()
+                return
+            }
+            previewSource = source
+            previewProbe = probe
+        }
+    }
+
+    private func stopPreview() async {
+        let wasPreviewing = isPreviewing
+        isPreviewing = false
+        previewChoices()
+        await previewTask?.value
+        isPreviewing = wasPreviewing
+    }
+
+    private func tearDownPreview() async {
+        let source = previewSource
+        previewSource = nil
+        previewProbe = nil
+        await source?.stop()
+    }
+
     // MARK: - Metering
 
     private func startMetering() {
+        meterTask?.cancel()
         meterTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(80))
-                guard let self, let writer = self.writer else { return }
-                let levels = writer.consumeLevels()
+                guard let self else { return }
+                let sink: (any AudioSink)? = writer ?? previewProbe
+                let levels = sink?.consumeLevels() ?? (microphone: 0, system: 0)
                 // Fall towards silence rather than snapping, so a meter reads
                 // as a level rather than a flicker.
                 self.microphoneLevel = max(levels.microphone, self.microphoneLevel * 0.6)
                 self.systemLevel = max(levels.system, self.systemLevel * 0.6)
 
+                guard self.state.isRecording else { continue }
                 if levels.system > 0 { self.systemEverHadSignal = true }
                 self.watchForBleed(levels)
                 if case .recording(let startedAt) = self.state,

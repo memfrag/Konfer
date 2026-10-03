@@ -52,8 +52,7 @@ struct RecordingSourceTests {
             RecordingConfiguration(
                 microphoneID: AudioInputDevices.available().first?.id,
                 recordsMicrophone: true,
-                systemAudio: .app(application),
-                outputURL: url
+                systemAudio: .app(application)
             )
         )
         try await recorder.start(writingTo: writer)
@@ -99,8 +98,7 @@ struct RecordingSourceTests {
             RecordingConfiguration(
                 microphoneID: AudioInputDevices.available().first?.id,
                 recordsMicrophone: false,
-                systemAudio: .app(application),
-                outputURL: url
+                systemAudio: .app(application)
             )
         )
         try await recorder.start(writingTo: writer)

@@ -36,7 +36,7 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
 
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
-    private var writer: TwoChannelWriter?
+    private var writer: (any AudioSink)?
 
     /// Whether the microphone is part of the aggregate at all.
     ///
@@ -139,7 +139,7 @@ nonisolated final class AggregateDeviceRecorder: RecordingSource, @unchecked Sen
         try setUpAudioUnit()
     }
 
-    func start(writingTo writer: TwoChannelWriter) async throws {
+    func start(writingTo writer: any AudioSink) async throws {
         guard let unit else { throw RecordingError.noAudioDevice }
         self.writer = writer
 

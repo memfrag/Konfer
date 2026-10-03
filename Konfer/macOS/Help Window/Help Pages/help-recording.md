@@ -14,7 +14,7 @@ Choose **File ▸ New Recording…** (⇧⌘R), or **Record a Meeting…** from 
 
 Konfer keeps the two sides apart: the microphone on the left channel and the call on the right. That is how the transcript can tell someone in the room from someone on the call, even when two voices sound alike. A recording takes about 350 MB an hour.
 
-**Save to** and **Name** decide where the file goes. Konfer suggests your Downloads folder and remembers any other folder you choose. Press **Record**, or Return, to start, and **Stop** to finish. The two meters show what each side is hearing.
+**Save to** and **Name** decide where the file goes. Konfer suggests your Downloads folder and remembers any other folder you choose. The two meters show what each side is hearing as soon as the window opens, so check them before you start: a bar that stays flat while you speak, or while the call is playing, means that side won't be recorded either. Press **Record**, or Return, to start, and **Stop** to finish.
 
 ## Warnings while you record
 

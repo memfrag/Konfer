@@ -18,7 +18,7 @@ import Foundation
 /// and a frame is only written once both have delivered it. A side that never
 /// delivers becomes silence rather than a stall: a missing microphone should
 /// give a quiet left channel, not a recording that hangs.
-nonisolated final class TwoChannelWriter: @unchecked Sendable {
+nonisolated final class TwoChannelWriter: AudioSink, @unchecked Sendable {
 
     /// Everything is resampled to this before writing, so the two sides agree
     /// regardless of what their devices run at.
@@ -202,7 +202,7 @@ nonisolated final class TwoChannelWriter: @unchecked Sendable {
     /// vDSP rather than a Swift loop: this runs on every captured buffer for
     /// the whole recording, and a bounds-checked loop is about a hundred times
     /// slower in a debug build (see `WaveformStore`).
-    private static func peak(of samples: [Float]) -> Float {
+    static func peak(of samples: [Float]) -> Float {
         guard !samples.isEmpty else { return 0 }
         var peak: Float = 0
         vDSP_maxmgv(samples, 1, &peak, vDSP_Length(samples.count))

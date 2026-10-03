@@ -51,14 +51,29 @@ nonisolated struct RecordingConfiguration: Sendable {
     var recordsMicrophone: Bool = true
 
     let systemAudio: SystemAudioSource
+}
 
-    /// Where the finished recording is written.
-    let outputURL: URL
+// MARK: - AudioSink
+
+/// Where a ``RecordingSource`` delivers its samples.
+///
+/// Usually a ``TwoChannelWriter``. Before a recording starts it is a
+/// ``LevelProbe``, so the meters can be checked against the very devices and
+/// permissions the recording will use — the point of a meter is to find a dead
+/// microphone before the hour, not after it.
+///
+/// Both append methods are called from realtime audio threads.
+nonisolated protocol AudioSink: AnyObject, Sendable {
+    func appendMicrophone(_ samples: [Float])
+    func appendSystemAudio(_ samples: [Float])
+
+    /// Peak level per channel since the previous call, 0...1.
+    func consumeLevels() -> (microphone: Float, system: Float)
 }
 
 // MARK: - RecordingSource
 
-/// Captures audio into a ``TwoChannelWriter``.
+/// Captures audio into an ``AudioSink``, normally a ``TwoChannelWriter``.
 ///
 /// Two implementations, chosen by the user rather than by us, because the
 /// trade-off is real in both directions: a process tap keeps the recording free
@@ -75,7 +90,7 @@ protocol RecordingSource: Sendable {
     /// failures surface before the user believes they are recording.
     func prepare(_ configuration: RecordingConfiguration) async throws
 
-    func start(writingTo writer: TwoChannelWriter) async throws
+    func start(writingTo writer: any AudioSink) async throws
 
     /// Stops capture and releases every system resource taken in `prepare`.
     func stop() async

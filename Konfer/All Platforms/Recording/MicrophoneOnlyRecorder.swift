@@ -14,7 +14,7 @@ import Foundation
 nonisolated final class MicrophoneOnlyRecorder: RecordingSource, @unchecked Sendable {
 
     private let engine = AVAudioEngine()
-    private var writer: TwoChannelWriter?
+    private var writer: (any AudioSink)?
 
     func prepare(_ configuration: RecordingConfiguration) async throws {
         if !AudioInputDevices.isAuthorized {
@@ -39,7 +39,7 @@ nonisolated final class MicrophoneOnlyRecorder: RecordingSource, @unchecked Send
         guard status == noErr else { throw RecordingError.noAudioDevice }
     }
 
-    func start(writingTo writer: TwoChannelWriter) async throws {
+    func start(writingTo writer: any AudioSink) async throws {
         self.writer = writer
         let input = engine.inputNode
         let format = input.inputFormat(forBus: 0)

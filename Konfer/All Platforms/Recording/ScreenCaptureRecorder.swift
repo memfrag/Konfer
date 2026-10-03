@@ -25,7 +25,7 @@ import ScreenCaptureKit
 nonisolated final class ScreenCaptureRecorder: NSObject, RecordingSource, @unchecked Sendable {
 
     private var stream: SCStream?
-    private var writer: TwoChannelWriter?
+    private var writer: (any AudioSink)?
     private var configuration: RecordingConfiguration?
 
     // MARK: - RecordingSource
@@ -49,7 +49,7 @@ nonisolated final class ScreenCaptureRecorder: NSObject, RecordingSource, @unche
         self.configuration = configuration
     }
 
-    func start(writingTo writer: TwoChannelWriter) async throws {
+    func start(writingTo writer: any AudioSink) async throws {
         guard let configuration else { throw RecordingError.noAudioDevice }
         self.writer = writer
 
