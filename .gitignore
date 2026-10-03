@@ -17,3 +17,7 @@ private-key*
 
 # Downloaded by scripts/build-and-notarize.sh.
 Sparkle-tools/
+
+# Built by scripts/pianissimo-coreml/convert.sh.
+scripts/pianissimo-coreml/.venv/
+scripts/pianissimo-coreml/build/

@@ -97,11 +97,12 @@ nonisolated enum ManagedModel: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// The download a speech model needs, or `nil` for one Konfer doesn't
-    /// fetch — Apple's, which macOS installs, KB-Whisper Small, which is
-    /// only reachable through `KONFER_BACKEND`, and Røst, which is gone.
+    /// fetch — Apple's, which macOS installs, KB-Whisper Small and Pianissimo,
+    /// which are only reachable through `KONFER_BACKEND`, and Røst, which is
+    /// gone.
     init?(for backend: ASRBackendKind) {
         switch backend {
-        case .appleSpeech, .kbWhisperSmall, .roestWhisper: return nil
+        case .appleSpeech, .kbWhisperSmall, .pianissimo, .roestWhisper: return nil
         case .kbWhisperLarge: self = .kbWhisperLarge
         case .whisperLargeV3: self = .whisperLargeV3
         }

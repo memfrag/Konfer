@@ -32,7 +32,7 @@ struct PipelineIntegrationTests {
     /// library instead of a throwaway directory, so the transcript can be
     /// opened in Konfer afterwards. Off by default — tests should not touch
     /// the user's data.
-    /// `KONFER_BACKEND=parakeet|kb-whisper-small|kb-whisper-large` picks the
+    /// `KONFER_BACKEND=pianissimo-sv|kb-whisper-small|kb-whisper-large` picks the
     /// model; defaults to whatever the app defaults to.
     nonisolated static var backend: ASRBackendKind {
         ProcessInfo.processInfo.environment["KONFER_BACKEND"]

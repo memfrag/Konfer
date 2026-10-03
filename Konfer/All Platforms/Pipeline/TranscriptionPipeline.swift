@@ -111,7 +111,7 @@ final class TranscriptionPipeline {
     /// Forces one model regardless of language, for comparing models on the
     /// same recording. Unset in normal use, where the language decides.
     ///
-    /// `KONFER_BACKEND=apple-speech|kb-whisper-small|kb-whisper-large`
+    /// `KONFER_BACKEND=apple-speech|kb-whisper-small|kb-whisper-large|pianissimo-sv`
     @ObservationIgnored
     static let backendOverride: ASRBackendKind? = ProcessInfo.processInfo
         .environment["KONFER_BACKEND"]

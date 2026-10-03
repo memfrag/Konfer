@@ -23,6 +23,7 @@ actor BackendRegistry {
         case .kbWhisperSmall: WhisperKitBackend(source: .kbWhisper(.small))
         case .kbWhisperLarge: WhisperKitBackend(source: .kbWhisper(.large))
         case .whisperLargeV3: WhisperKitBackend(source: .whisperKit(.largeV3))
+        case .pianissimo: ParakeetBackend()
         case .roestWhisper:
             // Supports no language, so `TranscriptionPipeline` refuses a job
             // for it before asking here. See `ASRBackendKind.roestWhisper`.

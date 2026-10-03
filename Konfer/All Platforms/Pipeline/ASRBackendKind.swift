@@ -43,6 +43,12 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
     case kbWhisperSmall = "kb-whisper-small"
     case kbWhisperLarge = "kb-whisper-large"
 
+    /// Pianissimo, Klang AI's Swedish fine-tune of Parakeet TDT v3, being
+    /// measured against KB-Whisper Large — see ``ParakeetBackend``. Reachable
+    /// only through `KONFER_BACKEND`, like KB-Whisper Small: nothing routes to
+    /// it and nothing offers it.
+    case pianissimo = "pianissimo-sv"
+
     /// Røst v3, the CoRal project's Danish fine-tune of large-v3, which 1.4
     /// offered as Danish's default. Removed: on a real Danish meeting it
     /// transcribed worse than stock large-v3, whatever its authors' benchmark
@@ -101,7 +107,7 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
     public func supports(_ language: MeetingLanguage) -> Bool {
         switch self {
         case .appleSpeech: ASRBackendKind(transcribing: language) == .appleSpeech
-        case .kbWhisperSmall, .kbWhisperLarge: language == .swedish
+        case .kbWhisperSmall, .kbWhisperLarge, .pianissimo: language == .swedish
         case .whisperLargeV3: true
         case .roestWhisper: false
         }
@@ -113,6 +119,7 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
         case .whisperLargeV3: "Whisper Large v3 — multilingual"
         case .kbWhisperSmall: "KB-Whisper Small — balanced"
         case .kbWhisperLarge: "KB-Whisper Large — most accurate"
+        case .pianissimo: "Pianissimo — fast Swedish"
         case .roestWhisper: "Røst v3 — no longer available"
         }
     }
@@ -129,6 +136,9 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
             "About 40× real time, 485 MB. Much better Swedish than Parakeet."
         case .kbWhisperLarge:
             "About 7× real time, 2.9 GB. The best Swedish available on-device."
+        case .pianissimo:
+            "Klang AI's Swedish fine-tune of Parakeet. About 120× real time, "
+            + "700 MB. Being measured against KB-Whisper Large."
         case .roestWhisper:
             "A Danish fine-tune of Whisper that Konfer no longer uses: stock "
             + "Whisper large-v3 transcribed Danish better."
@@ -139,6 +149,7 @@ public nonisolated enum ASRBackendKind: String, Codable, CaseIterable, Sendable 
     public var estimatedMinutesPerHourOfAudio: Double {
         switch self {
         case .appleSpeech: 1
+        case .pianissimo: 0.5
         case .kbWhisperSmall: 2
         case .kbWhisperLarge, .whisperLargeV3, .roestWhisper: 9
         }
