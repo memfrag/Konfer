@@ -3,6 +3,15 @@
     <channel>
         <title>Konfer</title>
         <item>
+            <title>1.5.0</title>
+            <pubDate>Sat, 03 Oct 2026 22:15:08 +0200</pubDate>
+            <sparkle:version>1.5.0</sparkle:version>
+            <sparkle:shortVersionString>1.5.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/memfrag/Konfer/releases/download/1.5.0/Konfer-1.5.0.dmg" length="14809533" type="application/octet-stream" sparkle:edSignature="mp/muXaoyGlm+adgDGBD2TU33ydm7mtixTEdH9gXUSD5pT0s3FiRpBi54RfhpifOCl7vm5n168e8OKDeLc+VBg=="/>
+        </item>
+        <item>
             <title>1.4.1</title>
             <pubDate>Sun, 27 Sep 2026 01:10:36 +0200</pubDate>
             <sparkle:version>1.4.1</sparkle:version>
@@ -19,15 +28,6 @@
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/memfrag/Konfer/releases/download/1.4.0/Konfer-1.4.0.dmg" length="14781874" type="application/octet-stream" sparkle:edSignature="VyeZlLqqaayOaRIvP3O5m1w099n1rgASwObvJbn3/iP5kffEqrmy/7mcj5Brk7jxzGaVkE1IprC93PFOfJ8VDQ=="/>
-        </item>
-        <item>
-            <title>1.3.2</title>
-            <pubDate>Tue, 08 Sep 2026 23:57:08 +0200</pubDate>
-            <sparkle:version>1.3.2</sparkle:version>
-            <sparkle:shortVersionString>1.3.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/memfrag/Konfer/releases/download/1.3.2/Konfer-1.3.2.dmg" length="14573124" type="application/octet-stream" sparkle:edSignature="hkZh3S+BZF3rb0ov2bhAZbeoTldGSQc8b3v78BB+/Nk0H5GfVBFON6TpNm3/qUKdnlgfMWnRFX5TCby2rLU+Cg=="/>
         </item>
     </channel>
 </rss>
